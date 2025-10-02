@@ -319,7 +319,7 @@ def resolve_clan_context(user_id, chat_id, clan_number=None):
 - `/bind_player <номер_клана>` - привязать игрока
 - `/my_clans` - список моих кланов
 - `/stats [номер]` - статистика клана
-- `/achievements` - мои достижения
+- `/achievements` или `/ach` - мои достижения
 
 ### **Информационные команды:**
 - `/help_passport` - помощь по паспортам

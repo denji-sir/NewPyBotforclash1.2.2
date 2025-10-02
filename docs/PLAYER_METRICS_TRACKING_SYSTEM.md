@@ -940,7 +940,7 @@ class MetricsCronManager:
 
 ### Команды для пользователей
 
-#### `/my_progress [период]` - Прогресс игрока
+#### `/progress [период]` - Прогресс игрока
 ```python
 async def cmd_my_progress(message: Message):
     """Показать прогресс за период"""

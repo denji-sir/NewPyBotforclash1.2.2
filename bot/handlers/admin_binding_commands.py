@@ -25,7 +25,7 @@ passport_service = PassportDatabaseService()
 binding_ui = PlayerBindingUI()
 
 
-@router.message(Command("admin_bindings"))
+@router.message(Command("apass"))
 async def admin_bindings_command(message: Message):
     """
     Главная команда административного управления привязками
@@ -486,7 +486,7 @@ async def bulk_verify_clan_members_callback(callback: CallbackQuery):
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
 
-@router.message(Command("binding_report"))
+@router.message(Command("areport"))
 async def binding_report_command(message: Message):
     """
     Команда для генерации детального отчета по привязкам

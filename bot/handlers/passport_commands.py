@@ -437,7 +437,7 @@ async def edit_passport_command(message: Message, command: CommandObject):
         )
 
 
-@passport_router.message(Command("passport_list"))
+@passport_router.message(Command("plist"))
 async def passport_list_command(message: Message):
     """
     Список всех паспортов в чате
@@ -905,7 +905,7 @@ async def passport_refresh_callback(callback: CallbackQuery):
         await callback.answer("❌ Ошибка обновления", show_alert=True)
 
 
-@passport_router.message(Command("delete_passport"))
+@passport_router.message(Command("dpassport"))
 async def delete_passport_command(message: Message):
     """
     Удаление паспорта (с подтверждением)

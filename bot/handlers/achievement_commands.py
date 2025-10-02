@@ -531,14 +531,14 @@ class AchievementCommands:
 
 
 # Регистрация команд
-@router.message(Command("achievements", "достижения"))
+@router.message(Command("achievements", "ach"))
 async def cmd_achievements(message: Message, user_context: UserContext):
     """Команда просмотра достижений"""
     handler = AchievementCommands()
     await handler.handle_achievements_list(message, user_context)
 
 
-@router.message(Command("my_progress", "прогресс"))
+@router.message(Command("my_progress", "progress"))
 async def cmd_my_progress(message: Message, user_context: UserContext):
     """Команда просмотра личного прогресса"""
     handler = AchievementCommands()
