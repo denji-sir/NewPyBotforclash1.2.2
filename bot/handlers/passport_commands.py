@@ -287,6 +287,16 @@ async def passport_command(message: Message, command: CommandObject):
                 ],
                 [
                     InlineKeyboardButton(
+                        text="🏆 Достижения",
+                        callback_data="passport_achievements"
+                    ),
+                    InlineKeyboardButton(
+                        text="💰 Ресурсы за сутки",
+                        callback_data="passport_daily_resources"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
                         text="🔄 Обновить",
                         callback_data="passport_refresh"
                     )
@@ -516,73 +526,162 @@ async def _format_passport_display(passport: PassportInfo, is_owner: bool = Fals
     # Основная информация
     text += f"👤 **{passport.display_name}**"
     if passport.username:
-        text += f" (@{passport.username})"
+        text += f" (телеграмм: @{passport.username})"
     text += "\n"
     
-    # Статус
-    status_emojis = {
-        PassportStatus.ACTIVE: "✅ Активный",
-        PassportStatus.INACTIVE: "⏸️ Неактивный", 
-        PassportStatus.PENDING: "⏳ Ожидание",
-        PassportStatus.BLOCKED: "🚫 Заблокирован"
-    }
-    text += f"📊 **Статус:** {status_emojis.get(passport.status, passport.status.value)}\n"
-    
-    # Био
-    if passport.bio:
-        text += f"📝 **О себе:** {passport.bio}\n"
-    
-    text += "\n"
+    # Тег игрока (если есть привязка)
+    if passport.player_binding and passport.player_binding.player_tag:
+        text += f"• Тег: `{passport.player_binding.player_tag}`\n"
     
     # Информация о клане
-    text += "🏰 **Клан:**\n"
+    text += f"🏰 **Клан:** "
     if passport.preferred_clan_name:
-        text += f"• Предпочитаемый: {passport.preferred_clan_name}\n"
-        if passport.preferred_clan_tag:
-            text += f"• Тег: `{passport.preferred_clan_tag}`\n"
+        text += f"{passport.preferred_clan_name}\n"
     else:
-        text += "• Не выбран\n"
+        text += "Не выбран\n"
     
-    # Привязка игрока
-    text += "\n🎮 **Игрок Clash of Clans:**\n"
-    if passport.player_binding:
-        binding = passport.player_binding
-        text += f"• **{binding.player_name}** `{binding.player_tag}`\n"
-        
-        if binding.verified:
-            text += "• ✅ Верифицирован"
-            if binding.verified_at:
-                text += f" {format_date(binding.verified_at)}"
-            text += "\n"
-        else:
-            text += "• ⏳ Ожидает верификации\n"
-            
-        if binding.clan_name and binding.clan_name != passport.preferred_clan_name:
-            text += f"• 🏰 Текущий клан: {binding.clan_name}\n"
-    else:
-        text += "• Не привязан\n"
-        text += "• Используйте `/bind_player <тег>` для привязки\n"
+    text += "\n"
     
-    # Статистика (если разрешено настройками)
+    # Статистика в чате (если разрешено настройками)
     if passport.settings.show_stats:
-        text += f"\n📊 **Статистика:**\n"
-        text += f"• 💬 Сообщений: {format_number(passport.stats.messages_count)}\n"
-        text += f"• 🤖 Команд использовано: {passport.stats.commands_used}\n"
-        text += f"• 📅 Дней активности: {passport.stats.days_active}\n"
+        text += f"📊 **Статистика в чате:**\n"
         
-        if passport.stats.last_activity:
-            text += f"• 🕐 Последняя активность: {format_date(passport.stats.last_activity)}\n"
+        # Позиция в топе чата
+        chat_rank = "❓ Неизвестно"
+        try:
+            # Получаем всех пользователей чата для расчета позиции
+            from bot.services.passport_system_manager import PassportSystemManager
+            passport_manager = PassportSystemManager()
+            
+            # Получаем все паспорта в чате
+            chat_passports = await passport_manager.get_chat_passports(passport.chat_id)
+            
+            if chat_passports:
+                # Сортируем по количеству сообщений
+                sorted_passports = sorted(
+                    chat_passports, 
+                    key=lambda p: p.stats.messages_count, 
+                    reverse=True
+                )
+                
+                # Находим позицию текущего пользователя
+                for rank, p in enumerate(sorted_passports, 1):
+                    if p.user_id == passport.user_id:
+                        total_users = len(sorted_passports)
+                        chat_rank = f"🏆 {rank} место из {total_users}"
+                        break
+                else:
+                    chat_rank = "❓ Не найден"
+            else:
+                chat_rank = "❓ Нет данных"
+        except Exception as e:
+            logger.warning(f"Could not get chat rank: {e}")
+            chat_rank = "❓ Ошибка получения"
+        
+        text += f"топ в чате: {chat_rank}\n"
+        
+        text += f"• 💬 Сообщений: {format_number(passport.stats.messages_count)}\n"
+        text += f"• 📅 Дней активности: {passport.stats.days_active}\n\n"
+    
+    # Игровая статистика (если есть привязка игрока)
+    if passport.player_binding and passport.player_binding.verified:
+        # Получаем статус клановых войн
+        war_status = "❓ Неизвестно"
+        if passport.player_binding and passport.player_binding.clan_tag:
+            try:
+                from ..services.extended_clash_api import ExtendedClashAPI
+                extended_api = ExtendedClashAPI()
+                async with extended_api:
+                    current_war = await extended_api.get_current_war(passport.player_binding.clan_tag)
+                    if current_war:
+                        if current_war.state.value == "preparation":
+                            war_status = "🔄 Подготовка"
+                        elif current_war.state.value == "inWar":
+                            war_status = "⚔️ В войне"
+                        elif current_war.state.value == "warEnded":
+                            war_status = "✅ Война завершена"
+                        else:
+                            war_status = "❓ Неизвестно"
+                    else:
+                        war_status = "❌ Не в войне"
+            except Exception as e:
+                logger.warning(f"Could not get war status: {e}")
+                war_status = "❓ Ошибка получения"
+        
+        text += f"участие в кв на данный момент: {war_status}\n"
+        
+        # Последний результат в рейдах
+        raid_result = "❓ Неизвестно"
+        if passport.player_binding and passport.player_binding.clan_tag:
+            try:
+                raids = await extended_api.get_capital_raid_seasons(passport.player_binding.clan_tag, limit=1)
+                if raids:
+                    last_raid = raids[0]
+                    # Ищем участника в рейде
+                    player_raid_data = None
+                    for member in last_raid.members:
+                        if member.tag == passport.player_binding.player_tag:
+                            player_raid_data = member
+                            break
+                    
+                    if player_raid_data:
+                        attacks_used = player_raid_data.attacks
+                        total_limit = player_raid_data.attack_limit + player_raid_data.bonus_attack_limit
+                        loot = player_raid_data.capital_resources_looted
+                        raid_result = f"⚔️ {attacks_used}/{total_limit} атак, 💰 {loot:,} лута"
+                    else:
+                        raid_result = "❌ Не участвовал"
+                else:
+                    raid_result = "❓ Нет данных"
+            except Exception as e:
+                logger.warning(f"Could not get raid results: {e}")
+                raid_result = "❓ Ошибка получения"
+        
+        text += f"последний результат в рейдах: {raid_result}\n"
+        
+        # Статистика донатов
+        seasonal_donations = "❓ Неизвестно"
+        total_donations = "❓ Неизвестно"
+        if passport.player_binding and passport.player_binding.clan_tag:
+            try:
+                # Получаем текущую статистику донатов
+                clan_info = await extended_api.get_extended_clan_info(passport.player_binding.clan_tag)
+                if clan_info and clan_info.member_list:
+                    # Ищем игрока в списке участников клана
+                    player_data = None
+                    for member in clan_info.member_list:
+                        if member.tag == passport.player_binding.player_tag:
+                            player_data = member
+                            break
+                    
+                    if player_data:
+                        seasonal_donations = f"🎁 {player_data.donations:,} / 📥 {player_data.donations_received:,}"
+                        # Для общей статистики используем те же данные (API не предоставляет исторические данные)
+                        total_donations = f"🎁 {player_data.donations:,} / 📥 {player_data.donations_received:,}"
+                    else:
+                        seasonal_donations = "❌ Не в клане"
+                        total_donations = "❌ Не в клане"
+                else:
+                    seasonal_donations = "❓ Нет данных"
+                    total_donations = "❓ Нет данных"
+            except Exception as e:
+                logger.warning(f"Could not get donation stats: {e}")
+                seasonal_donations = "❓ Ошибка получения"
+                total_donations = "❓ Ошибка получения"
+        
+        text += f"кол-во донатов в клане за сезон: {seasonal_donations}\n"
+        text += f"за все время: {total_donations}\n\n"
     
     # Дополнительная информация для владельца
     if is_owner:
-        text += f"\n🔧 **Настройки:**\n"
+        text += f"🔧 **Настройки:**\n"
         text += f"• 🎨 Тема: {passport.settings.theme.value}\n"
-        text += f"• 🔒 Приватность: уровень {passport.settings.privacy_level}\n"
+        text += f"• 🔒 Приватность: уровень {passport.settings.privacy_level}\n\n"
     
-    # Информация о создании
-    text += f"\n📅 **Создан:** {format_date(passport.created_at)}\n"
+    # Информация о создании (сокращенная)
+    text += f"📅 **Создан:** {format_date(passport.created_at)}\n"
     if passport.updated_at and passport.updated_at != passport.created_at:
-        text += f"🔄 **Обновлен:** {format_date(passport.updated_at)}"
+        text += f"🔄 **Обновлен:** {format_date(passport.updated_at)}\n"
     
     return text
 
@@ -857,6 +956,31 @@ async def settings_toggle_clan_callback(callback: CallbackQuery):
         await callback.answer("❌ Ошибка", show_alert=True)
 
 
+@passport_router.callback_query(F.data == "passport_achievements")
+async def passport_achievements_callback(callback: CallbackQuery):
+    """Показать достижения игрока"""
+    try:
+        # Перенаправляем на команду достижений
+        await callback.message.edit_text(
+            "🏆 **Достижения**\n\n"
+            "Используйте команду `/achievements` или `/ach` для просмотра ваших достижений и заработанных ресурсов.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🔙 Назад к паспорту",
+                        callback_data="passport_refresh"
+                    )
+                ]
+            ])
+        )
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error in passport_achievements_callback: {e}")
+        await callback.answer("❌ Ошибка загрузки достижений")
+
+
 @passport_router.callback_query(F.data == "passport_refresh")
 async def passport_refresh_callback(callback: CallbackQuery):
     """Обновление отображения паспорта"""
@@ -1007,3 +1131,143 @@ async def cancel_delete_passport_callback(callback: CallbackQuery):
     """Отмена удаления паспорта"""
     await callback.message.edit_text("🚫 **Удаление паспорта отменено.**")
     await callback.answer("Отменено")
+
+
+@passport_router.callback_query(F.data == "passport_daily_resources")
+async def passport_daily_resources_callback(callback: CallbackQuery):
+    """Обработчик кнопки 'Ресурсы за сутки'"""
+    try:
+        # Получаем паспорт пользователя
+        passport_service = get_passport_db_service()
+        passport = await passport_service.get_passport_by_user_id(callback.from_user.id)
+        
+        if not passport:
+            await callback.answer("❌ Паспорт не найден", show_alert=True)
+            return
+        
+        # Получаем данные игрока через API
+        from ..services.extended_clash_api import get_extended_clash_api
+        extended_api = get_extended_clash_api()
+        
+        try:
+            player_data = await extended_api.get_player_detailed_info(passport.player_tag)
+        except Exception as api_error:
+            logger.error(f"API error for player {passport.player_tag}: {api_error}")
+            await callback.answer("❌ Ошибка получения данных игрока", show_alert=True)
+            return
+        
+        # Проверяем доступность достижений
+        achievements = player_data.get('achievements', [])
+        if not achievements:
+            await callback.message.edit_text(
+                "❌ **Достижения недоступны**\n\n"
+                "К сожалению, ваши достижения закрыты для просмотра.\n"
+                "Это ограничение со стороны игры - мы не можем предоставить статистику по ресурсам.\n\n"
+                "💡 **Как исправить:**\n"
+                "• Откройте настройки профиля в игре\n"
+                "• Включите публичный доступ к достижениям\n"
+                "• Попробуйте снова через несколько минут",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🔙 Назад к паспорту", callback_data="passport_refresh")]
+                ])
+            )
+            await callback.answer()
+            return
+        
+        # Ищем ключевые достижения для ресурсов
+        key_achievements = {
+            'Gold Grab': None,
+            'Elixir Escapade': None, 
+            'Heroic Heist': None
+        }
+        
+        for achievement in achievements:
+            name = achievement.get('name', '')
+            if name in key_achievements:
+                key_achievements[name] = achievement
+        
+        # Используем сервис ежедневных ресурсов для вычисления
+        from ..services.daily_resources_service import get_daily_resources_service
+        daily_resources_service = get_daily_resources_service()
+        
+        # Инициализируем базу данных если нужно
+        await daily_resources_service.initialize_database()
+        
+        # Вычисляем нафармленные ресурсы за день
+        resources_data = await daily_resources_service.calculate_daily_resources(
+            passport.player_tag, 
+            achievements
+        )
+        
+        # Подготавливаем данные для отображения
+        resource_names = {
+            'gold': ('🥇 Золото', 'gold_farmed'),
+            'elixir': ('⚗️ Эликсир', 'elixir_farmed'),
+            'dark_elixir': ('🖤 Темный эликсир', 'dark_elixir_farmed')
+        }
+        
+        resources_farmed = {}
+        total_farmed = resources_data.get('total_farmed', 0)
+        
+        for resource_type, (display_name, data_key) in resource_names.items():
+            farmed = resources_data.get(data_key, 0)
+            
+            # Получаем текущее общее значение из достижений
+            achievement_name = {
+                'gold': 'Gold Grab',
+                'elixir': 'Elixir Escapade', 
+                'dark_elixir': 'Heroic Heist'
+            }.get(resource_type, '')
+            
+            current_total = 0
+            if achievement_name and achievement_name in key_achievements and key_achievements[achievement_name]:
+                current_total = key_achievements[achievement_name].get('value', 0)
+            
+            resources_farmed[resource_type] = {
+                'display_name': display_name,
+                'farmed': farmed,
+                'current_total': current_total
+            }
+        
+        # Формируем сообщение
+        text = f"💰 **Ресурсы за сутки**\n"
+        text += f"👤 **{player_data.get('name', 'Неизвестно')}** {passport.player_tag}\n\n"
+        
+        if total_farmed > 0:
+            text += "📊 **Нафармлено сегодня:**\n"
+            for resource_type, data in resources_farmed.items():
+                if data['farmed'] > 0:
+                    text += f"• {data['display_name']}: {format_number(data['farmed'])}\n"
+            
+            text += f"\n💎 **Общая ценность:** {format_number(total_farmed)}\n\n"
+            
+            text += "📈 **Общий прогресс:**\n"
+            for resource_type, data in resources_farmed.items():
+                text += f"• {data['display_name']}: {format_number(data['current_total'])}\n"
+        else:
+            text += "😴 **Сегодня ресурсы не фармились**\n\n"
+            text += "💡 Начните атаковать, чтобы увидеть статистику!\n\n"
+            text += "📈 **Общий прогресс:**\n"
+            for resource_type, data in resources_farmed.items():
+                text += f"• {data['display_name']}: {format_number(data['current_total'])}\n"
+        
+        text += f"\n⏰ **Обновлено:** {datetime.now().strftime('%H:%M')}\n"
+        text += "🔄 Базис обновляется каждый день в 00:00 МСК"
+        
+        await callback.message.edit_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="🔄 Обновить", callback_data="passport_daily_resources"),
+                    InlineKeyboardButton(text="🔙 Назад к паспорту", callback_data="passport_refresh")
+                ]
+            ])
+        )
+        
+        await callback.answer()
+        
+    except Exception as e:
+        logger.error(f"Error in passport_daily_resources_callback: {e}")
+        await callback.answer("❌ Ошибка получения данных", show_alert=True)

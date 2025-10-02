@@ -41,6 +41,14 @@ except ImportError:
     PASSPORT_AVAILABLE = False
     logging.warning("Passport system not found, running without passports")
 
+# Импорты системы ежедневных ресурсов
+try:
+    from bot.services.daily_baseline_scheduler import daily_baseline_scheduler
+    DAILY_RESOURCES_AVAILABLE = True
+except ImportError:
+    DAILY_RESOURCES_AVAILABLE = False
+    logging.warning("Daily resources system not found, running without daily resources tracking")
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -138,10 +146,16 @@ class NewPyBot:
                 self.dp.include_router(passport_router)
                 logger.info("✅ Passport system registered")
             
-            # 8. Устанавливаем команды бота
+            # 8. Запускаем планировщик ежедневных базисов (если доступен)
+            if DAILY_RESOURCES_AVAILABLE:
+                logger.info("⏰ Starting daily baseline scheduler...")
+                await daily_baseline_scheduler.start()
+                logger.info("✅ Daily baseline scheduler started")
+            
+            # 9. Устанавливаем команды бота
             await self._setup_bot_commands()
             
-            # 9. Проверяем статус всех систем
+            # 10. Проверяем статус всех систем
             await self._check_systems_status()
             
             self._initialized = True
@@ -264,6 +278,14 @@ class NewPyBot:
                     logger.info("✅ Achievement system shut down")
                 except Exception as e:
                     logger.error(f"❌ Error shutting down achievement system: {e}")
+            
+            # Останавливаем планировщик ежедневных базисов
+            if DAILY_RESOURCES_AVAILABLE:
+                try:
+                    await daily_baseline_scheduler.stop()
+                    logger.info("✅ Daily baseline scheduler stopped")
+                except Exception as e:
+                    logger.error(f"❌ Error stopping daily baseline scheduler: {e}")
             
             # Закрываем сессию бота
             if self.bot:
