@@ -19,7 +19,13 @@ class GreetingService:
     """
     
     def __init__(self, db_path: str = "bot_data.db"):
-        self.db_path = db_path
+        # Извлекаем путь из database URL
+        if ':///' in db_path:
+            self.db_path = db_path.split(':///')[-1]
+        elif '://' in db_path:
+            self.db_path = db_path.split('://')[-1]
+        else:
+            self.db_path = db_path
         
         # Кэш настроек для быстрого доступа
         self._settings_cache: Dict[int, GreetingSettings] = {}

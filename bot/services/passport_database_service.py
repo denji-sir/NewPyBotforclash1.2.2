@@ -20,7 +20,13 @@ class PassportDatabaseService:
     """Сервис для работы с базой данных паспортов"""
     
     def __init__(self, db_path: str = "data/passports.db"):
-        self.db_path = db_path
+        # Извлекаем путь из database URL (например, sqlite+aiosqlite:///./data/database/bot.db)
+        if ':///' in db_path:
+            self.db_path = db_path.split(':///')[-1]
+        elif '://' in db_path:
+            self.db_path = db_path.split('://')[-1]
+        else:
+            self.db_path = db_path
     
     async def create_passport(self, user_id: int, chat_id: int, username: Optional[str] = None,
                              display_name: Optional[str] = None, preferred_clan_id: Optional[int] = None) -> PassportInfo:
@@ -425,9 +431,15 @@ class PassportDatabaseService:
 # Глобальные функции
 _passport_db_service = None
 
+def init_passport_db_service(db_path: str) -> PassportDatabaseService:
+    """Инициализация глобального сервиса БД паспортов"""
+    global _passport_db_service
+    _passport_db_service = PassportDatabaseService(db_path)
+    return _passport_db_service
+
 def get_passport_db_service() -> PassportDatabaseService:
     """Получение экземпляра сервиса БД паспортов"""
     global _passport_db_service
     if _passport_db_service is None:
-        _passport_db_service = PassportDatabaseService()
+        raise RuntimeError("Passport DB service not initialized. Call init_passport_db_service() first.")
     return _passport_db_service

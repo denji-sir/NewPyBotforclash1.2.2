@@ -16,7 +16,13 @@ class DailyResourcesService:
     """Сервис для работы с ежедневными ресурсами игроков"""
     
     def __init__(self, db_path: str = "data/daily_resources.db"):
-        self.db_path = db_path
+        # Извлекаем путь из database URL
+        if ':///' in db_path:
+            self.db_path = db_path.split(':///')[-1]
+        elif '://' in db_path:
+            self.db_path = db_path.split('://')[-1]
+        else:
+            self.db_path = db_path
         self.moscow_tz = timezone(timedelta(hours=3))  # МСК = UTC+3
         
     async def initialize_database(self) -> bool:

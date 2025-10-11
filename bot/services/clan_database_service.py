@@ -20,7 +20,13 @@ class ClanDatabaseService:
     """Сервис для работы с кланами в базе данных"""
     
     def __init__(self, db_path: str):
-        self.db_path = db_path
+        # Извлекаем путь из database URL (например, sqlite+aiosqlite:///./data/database/bot.db)
+        if ':///' in db_path:
+            self.db_path = db_path.split(':///')[-1]
+        elif '://' in db_path:
+            self.db_path = db_path.split('://')[-1]
+        else:
+            self.db_path = db_path
     
     async def register_clan(self, clan_data: ClanData, chat_id: int, 
                           registered_by: int, description: str = None) -> int:
