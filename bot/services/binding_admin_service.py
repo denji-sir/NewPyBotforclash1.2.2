@@ -8,9 +8,9 @@ import logging
 from datetime import datetime, timedelta
 import asyncio
 
-from ..services.passport_database_service import PassportDatabaseService
+from ..services.passport_database_service import get_passport_db_service
 from ..services.player_binding_service import PlayerBindingService
-from ..services.clan_database_service import ClanDatabaseService
+from ..services.clan_database_service import get_clan_db_service
 from ..models.passport_models import PassportOperationLog, PlayerBinding, PassportInfo
 from ..utils.permissions import check_admin_permission, get_user_permissions
 
@@ -21,9 +21,9 @@ class BindingAdminService:
     """Административный сервис для управления привязками игроков"""
     
     def __init__(self):
-        self.passport_service = PassportDatabaseService()
+        self.passport_service = get_passport_db_service()
         self.binding_service = PlayerBindingService()
-        self.clan_service = ClanDatabaseService()
+        self.clan_service = get_clan_db_service()
     
     async def get_verification_queue(
         self,

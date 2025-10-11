@@ -11,8 +11,8 @@ import json
 
 from ..services.achievement_service import AchievementService
 from ..services.user_context_service import UserContextService
-from ..services.passport_database_service import PassportDatabaseService
-from ..services.clan_database_service import ClanDatabaseService
+from ..services.passport_database_service import get_passport_db_service
+from ..services.clan_database_service import get_clan_db_service
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ class AchievementEventTracker:
     def __init__(self):
         self.achievement_service = AchievementService()
         self.context_service = UserContextService()
-        self.passport_service = PassportDatabaseService()
-        self.clan_service = ClanDatabaseService()
+        self.passport_service = get_passport_db_service()
+        self.clan_service = get_clan_db_service()
         
         # Очередь событий для обработки
         self._event_queue: asyncio.Queue = asyncio.Queue()

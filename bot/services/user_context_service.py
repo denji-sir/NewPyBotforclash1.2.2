@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass
 from enum import Enum
 
-from ..services.passport_database_service import PassportDatabaseService
-from ..services.clan_database_service import ClanDatabaseService
-from ..services.coc_api_service import CoCAPIService
+from ..services.passport_database_service import get_passport_db_service
+from ..services.clan_database_service import get_clan_db_service
+from ..services.coc_api_service import get_coc_api_service
 from ..models.passport_models import PassportInfo, PlayerBinding
 from ..utils.cache import CacheManager
 
@@ -102,9 +102,9 @@ class UserContextService:
     """Сервис для определения и анализа контекста пользователя"""
     
     def __init__(self):
-        self.passport_service = PassportDatabaseService()
-        self.clan_service = ClanDatabaseService()
-        self.coc_api = CoCAPIService()
+        self.passport_service = get_passport_db_service()
+        self.clan_service = get_clan_db_service()
+        self.coc_api = get_coc_api_service()
         self.cache = CacheManager()
         
         # Кэш контекстов пользователей

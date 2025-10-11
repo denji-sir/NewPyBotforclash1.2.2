@@ -11,9 +11,9 @@ import json
 import sqlite3
 
 from ..models.achievement_models import (
-    Achievement, UserAchievementProgress, UserProfile, LeaderboardEntry,
-    AchievementStatus, AchievementCategory, AchievementDifficulty,
-    AchievementRequirement, RewardType, SYSTEM_ACHIEVEMENTS
+    Achievement, AchievementCategory, AchievementDifficulty, AchievementStatus,
+    UserAchievementProgress, UserProfile, AchievementRequirement, AchievementReward,
+    RewardType, LeaderboardEntry, SYSTEM_ACHIEVEMENTS
 )
 from ..services.passport_database_service import PassportDatabaseService
 from ..services.clan_database_service import ClanDatabaseService
@@ -28,9 +28,15 @@ class AchievementService:
     """
     
     def __init__(self, db_path: str = "bot_data.db"):
-        self.db_path = db_path
-        self.passport_service = PassportDatabaseService()
-        self.clan_service = ClanDatabaseService()
+        # Извлекаем путь из database URL
+        if ':///' in db_path:
+            self.db_path = db_path.split(':///')[-1]
+        elif '://' in db_path:
+            self.db_path = db_path.split('://')[-1]
+        else:
+            self.db_path = db_path
+        self.passport_service = PassportDatabaseService(db_path)
+        self.clan_service = ClanDatabaseService(db_path)
         self.context_service = UserContextService()
         
         # Кэш достижений для быстрого доступа

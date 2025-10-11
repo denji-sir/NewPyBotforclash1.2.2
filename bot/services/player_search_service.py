@@ -9,9 +9,9 @@ import re
 import asyncio
 from datetime import datetime, timedelta
 
-from ..services.coc_api_service import CoCAPIService
-from ..services.clan_database_service import ClanDatabaseService
-from ..services.passport_database_service import PassportDatabaseService
+from ..services.coc_api_service import get_coc_api_service
+from ..services.clan_database_service import get_clan_db_service
+from ..services.passport_database_service import get_passport_db_service
 from ..models.passport_models import PlayerBinding
 from ..utils.validators import validate_player_tag
 from ..utils.cache import CacheManager
@@ -23,9 +23,9 @@ class PlayerSearchService:
     """Сервис для расширенного поиска и выбора игроков"""
     
     def __init__(self):
-        self.coc_api = CoCAPIService()
-        self.clan_service = ClanDatabaseService()
-        self.passport_service = PassportDatabaseService()
+        self.coc_api = get_coc_api_service()
+        self.clan_service = get_clan_db_service()
+        self.passport_service = get_passport_db_service()
         self.cache = CacheManager()
         
         # Кэш для поисковых результатов
