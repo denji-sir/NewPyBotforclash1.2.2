@@ -5,7 +5,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from .daily_resources_service import get_daily_resources_service
+from .daily_resources_service import DailyResourcesService
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +13,11 @@ logger = logging.getLogger(__name__)
 class DailyBaselineScheduler:
     """Планировщик для обновления базисов ресурсов в 00:00 МСК"""
     
-    def __init__(self):
+    def __init__(self, db_path: str):
         self.moscow_tz = timezone(timedelta(hours=3))  # МСК = UTC+3
         self.is_running = False
         self.task: Optional[asyncio.Task] = None
+        self.daily_resources_service = DailyResourcesService(db_path)
         
     async def start(self):
         """Запуск планировщика"""
@@ -83,8 +84,7 @@ class DailyBaselineScheduler:
         try:
             logger.info("Starting daily baseline update...")
             
-            daily_resources_service = get_daily_resources_service()
-            results = await daily_resources_service.update_all_baselines()
+            results = await self.daily_resources_service.update_all_baselines()
             
             logger.info(
                 f"Daily baseline update completed: "
@@ -95,7 +95,7 @@ class DailyBaselineScheduler:
                 logger.warning(f"Errors during baseline update: {results['errors'][:5]}")  # Показываем первые 5 ошибок
                 
             # Очищаем старые базисы (старше 30 дней)
-            cleaned = await daily_resources_service.cleanup_old_baselines(30)
+            cleaned = await self.daily_resources_service.cleanup_old_baselines(30)
             if cleaned > 0:
                 logger.info(f"Cleaned up {cleaned} old baseline records")
                 
@@ -106,20 +106,25 @@ class DailyBaselineScheduler:
         """Принудительное обновление базисов (для тестирования)"""
         logger.info("Force updating baselines...")
         await self._update_baselines()
-        
-        daily_resources_service = get_daily_resources_service()
-        return await daily_resources_service.update_all_baselines()
+        return await self.daily_resources_service.update_all_baselines()
 
 
 # Глобальный экземпляр планировщика
 _scheduler = None
 
 
+def init_daily_baseline_scheduler(db_path: str) -> DailyBaselineScheduler:
+    """Инициализация глобального планировщика"""
+    global _scheduler
+    _scheduler = DailyBaselineScheduler(db_path)
+    return _scheduler
+
+
 def get_daily_baseline_scheduler() -> DailyBaselineScheduler:
     """Получение глобального экземпляра планировщика"""
     global _scheduler
     if _scheduler is None:
-        _scheduler = DailyBaselineScheduler()
+        raise RuntimeError("Scheduler not initialized. Call init_daily_baseline_scheduler() first.")
     return _scheduler
 
 
