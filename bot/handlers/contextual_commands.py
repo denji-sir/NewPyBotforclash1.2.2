@@ -353,8 +353,16 @@ class ContextualCommandSystem:
         return builder.as_markup()
 
 
-# Инициализация системы
-contextual_system = ContextualCommandSystem()
+# Ленивая инициализация системы
+def get_contextual_system():
+    """Ленивое получение ContextualCommandSystem"""
+    from functools import lru_cache
+    
+    @lru_cache
+    def _get():
+        return ContextualCommandSystem()
+    
+    return _get()
 
 
 @router.message(Command("smart"))
@@ -365,19 +373,19 @@ async def smart_command_menu(message: Message):
     """
     try:
         # Получаем контекст пользователя
-        context = await contextual_system.context_service.get_user_context(
+        context = await get_contextual_system().context_service.get_user_context(
             user_id=message.from_user.id,
             chat_id=message.chat.id
         )
         
         # Получаем контекстуальные команды
-        commands = await contextual_system.get_contextual_commands(context)
+        commands = await get_contextual_system().get_contextual_commands(context)
         
         # Создаем персонализированное приветствие
         greeting = _format_personalized_greeting(context)
         
         # Создаем клавиатуру
-        keyboard = contextual_system.create_contextual_keyboard(
+        keyboard = get_contextual_system().create_contextual_keyboard(
             commands, message.from_user.id
         )
         
@@ -403,7 +411,7 @@ async def smart_command_menu(message: Message):
         )
         
         # Обновляем статистику взаимодействия
-        await contextual_system.context_service.update_user_interaction(
+        await get_contextual_system().context_service.update_user_interaction(
             user_id=message.from_user.id,
             chat_id=message.chat.id,
             command="smart",
@@ -430,7 +438,7 @@ async def handle_contextual_command(callback: CallbackQuery):
             return
         
         # Получаем контекст пользователя
-        context = await contextual_system.context_service.get_user_context(
+        context = await get_contextual_system().context_service.get_user_context(
             user_id=user_id,
             chat_id=callback.message.chat.id
         )
@@ -439,7 +447,7 @@ async def handle_contextual_command(callback: CallbackQuery):
         await _execute_contextual_command(callback, command, context)
         
         # Обновляем статистику
-        await contextual_system.context_service.update_user_interaction(
+        await get_contextual_system().context_service.update_user_interaction(
             user_id=user_id,
             chat_id=callback.message.chat.id,
             command=command,
@@ -459,7 +467,7 @@ async def my_status_command(message: Message):
     """
     try:
         # Получаем контекст пользователя
-        context = await contextual_system.context_service.get_user_context(
+        context = await get_contextual_system().context_service.get_user_context(
             user_id=message.from_user.id,
             chat_id=message.chat.id
         )
@@ -491,7 +499,7 @@ async def context_help_command(message: Message):
     """
     try:
         # Получаем контекст пользователя
-        context = await contextual_system.context_service.get_user_context(
+        context = await get_contextual_system().context_service.get_user_context(
             user_id=message.from_user.id,
             chat_id=message.chat.id
         )

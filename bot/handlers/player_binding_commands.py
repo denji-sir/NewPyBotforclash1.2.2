@@ -10,25 +10,20 @@ import logging
 import re
 from typing import Optional, List, Dict, Any
 
-from ..services.player_binding_service import PlayerBindingService
-from ..services.passport_database_service import PassportDatabaseService
-from ..services.passport_system_manager import PassportSystemManager
-from ..services.clan_database_service import ClanDatabaseService
-from ..services.coc_api_service import CoCAPIService
 from ..models.passport_models import PlayerBinding, PassportOperationLog
-from ..utils.permissions import check_admin_permission, get_user_permissions
+from ..utils.permissions import is_admin, is_group_admin
 from ..utils.formatting import format_player_info, format_clan_info
 from ..utils.validators import validate_player_tag
+from ._deps import (
+    get_player_binding_service,
+    get_passport_service,
+    get_passport_manager,
+    get_clan_service,
+    get_coc_api_service
+)
 
 router = Router()
 logger = logging.getLogger(__name__)
-
-# Инициализация сервисов
-player_binding_service = PlayerBindingService()
-passport_service = PassportDatabaseService()
-passport_manager = PassportSystemManager()
-clan_service = ClanDatabaseService()
-coc_api = CoCAPIService()
 
 
 @router.message(Command("bind_player"))
@@ -39,7 +34,7 @@ async def bind_player_command(message: Message):
     """
     try:
         # Проверяем наличие паспорта
-        passport = await passport_service.get_passport_by_user(
+        passport = await get_passport_service().get_passport_by_user(
             user_id=message.from_user.id,
             chat_id=message.chat.id
         )
@@ -150,7 +145,7 @@ async def select_from_clan_callback(callback: CallbackQuery):
             return
         
         # Получаем паспорт пользователя
-        passport = await passport_service.get_passport_by_user(
+        passport = await get_passport_service().get_passport_by_user(
             user_id=user_id,
             chat_id=callback.message.chat.id
         )
@@ -169,7 +164,7 @@ async def select_from_clan_callback(callback: CallbackQuery):
             return
         
         # Получаем информацию о клане
-        clan = await clan_service.get_clan_by_id(passport.preferred_clan_id)
+        clan = await get_clan_service().get_clan_by_id(passport.preferred_clan_id)
         if not clan:
             await callback.message.edit_text(
                 "❌ Клан не найден в базе данных!"
@@ -178,7 +173,7 @@ async def select_from_clan_callback(callback: CallbackQuery):
         
         # Получаем участников клана через CoC API
         try:
-            clan_members = await player_binding_service.get_clan_members_for_binding(clan.clan_tag)
+            clan_members = await get_player_binding_service().get_clan_members_for_binding(clan.clan_tag)
             
             if not clan_members:
                 await callback.message.edit_text(
@@ -275,7 +270,7 @@ async def _bind_player_by_tag(message_or_callback, player_tag: str, edit_message
             player_tag = f"#{player_tag}"
         
         # Привязываем игрока через сервис
-        result = await player_binding_service.bind_player_to_passport(
+        result = await get_player_binding_service().bind_player_to_passport(
             user_id=user_id,
             chat_id=chat_id,
             player_tag=player_tag,
@@ -415,7 +410,7 @@ async def verify_player_command(message: Message):
             return
         
         # Получаем паспорт пользователя
-        passport = await passport_service.get_passport_by_user(
+        passport = await get_passport_service().get_passport_by_user(
             user_id=target_user_id,
             chat_id=message.chat.id
         )
@@ -427,7 +422,7 @@ async def verify_player_command(message: Message):
             return
         
         # Верифицируем привязку
-        result = await player_binding_service.verify_player_binding(
+        result = await get_player_binding_service().verify_player_binding(
             user_id=target_user_id,
             chat_id=message.chat.id,
             admin_id=message.from_user.id,
@@ -458,7 +453,7 @@ async def _show_unverified_bindings(message: Message):
     """Показать список неверифицированных привязок в чате"""
     try:
         # Получаем все паспорта чата
-        passports = await passport_service.get_chat_passports(
+        passports = await get_passport_service().get_chat_passports(
             chat_id=message.chat.id,
             include_stats=True
         )
@@ -532,7 +527,7 @@ async def verify_binding_callback(callback: CallbackQuery):
             return
         
         # Верифицируем привязку
-        result = await player_binding_service.verify_player_binding(
+        result = await get_player_binding_service().verify_player_binding(
             user_id=target_user_id,
             chat_id=callback.message.chat.id,
             admin_id=admin_id,
@@ -555,7 +550,7 @@ async def _refresh_unverified_list(callback: CallbackQuery):
     """Обновить список неверифицированных привязок"""
     try:
         # Получаем все паспорта чата
-        passports = await passport_service.get_chat_passports(
+        passports = await get_passport_service().get_chat_passports(
             chat_id=callback.message.chat.id,
             include_stats=True
         )
@@ -609,7 +604,7 @@ async def unbind_player_command(message: Message):
     """
     try:
         # Получаем паспорт пользователя
-        passport = await passport_service.get_passport_by_user(
+        passport = await get_passport_service().get_passport_by_user(
             user_id=message.from_user.id,
             chat_id=message.chat.id
         )
@@ -664,7 +659,7 @@ async def confirm_unbind_callback(callback: CallbackQuery):
             return
         
         # Отвязываем игрока
-        result = await player_binding_service.unbind_player_from_passport(
+        result = await get_player_binding_service().unbind_player_from_passport(
             user_id=user_id,
             chat_id=callback.message.chat.id,
             requester_id=user_id
@@ -695,7 +690,7 @@ async def binding_stats_command(message: Message):
     """
     try:
         # Получаем статистику привязок
-        stats = await player_binding_service.get_binding_statistics(
+        stats = await get_player_binding_service().get_binding_statistics(
             chat_id=message.chat.id
         )
         
@@ -830,7 +825,7 @@ async def view_binding_callback(callback: CallbackQuery):
             await callback.answer("❌ Это не ваше меню!", show_alert=True)
             return
         
-        passport = await passport_service.get_passport_by_user(
+        passport = await get_passport_service().get_passport_by_user(
             user_id=user_id,
             chat_id=callback.message.chat.id
         )
@@ -845,7 +840,7 @@ async def view_binding_callback(callback: CallbackQuery):
         
         # Получаем дополнительную информацию об игроке из CoC API
         try:
-            player_info = await coc_api.get_player(binding.player_tag)
+            player_info = await get_coc_api_service().get_player(binding.player_tag)
             
             if player_info:
                 detailed_info = (

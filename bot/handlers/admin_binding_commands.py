@@ -10,19 +10,13 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from ..services.binding_admin_service import BindingAdminService
-from ..services.passport_database_service import PassportDatabaseService
 from ..ui.player_binding_ui import PlayerBindingUI
 from ..utils.permissions import check_admin_permission
 from ..utils.formatting import format_binding_stats, format_admin_report
+from ._deps import get_admin_service, get_passport_service
 
 router = Router()
 logger = logging.getLogger(__name__)
-
-# Инициализация сервисов
-admin_service = BindingAdminService()
-passport_service = PassportDatabaseService()
-binding_ui = PlayerBindingUI()
 
 
 @router.message(Command("apass"))
@@ -45,12 +39,12 @@ async def admin_bindings_command(message: Message):
             return
         
         # Получаем базовую статистику
-        queue_result = await admin_service.get_verification_queue(
+        queue_result = await get_admin_service().get_verification_queue(
             chat_id=message.chat.id,
             admin_id=message.from_user.id
         )
         
-        conflicts_result = await admin_service.get_binding_conflicts(
+        conflicts_result = await get_admin_service().get_binding_conflicts(
             chat_id=message.chat.id,
             admin_id=message.from_user.id
         )
@@ -115,7 +109,7 @@ async def admin_verification_queue_callback(callback: CallbackQuery):
             return
         
         # Получаем очередь верификации
-        queue_result = await admin_service.get_verification_queue(
+        queue_result = await get_admin_service().get_verification_queue(
             chat_id=callback.message.chat.id,
             admin_id=admin_id
         )
@@ -150,7 +144,7 @@ async def admin_verification_queue_callback(callback: CallbackQuery):
             return
         
         # Создаем клавиатуру с очередью
-        keyboard = await binding_ui.create_verification_queue_keyboard(
+        keyboard = await PlayerBindingUI().create_verification_queue_keyboard(
             queue, admin_id
         )
         
@@ -179,7 +173,7 @@ async def admin_binding_conflicts_callback(callback: CallbackQuery):
             return
         
         # Получаем конфликты
-        conflicts_result = await admin_service.get_binding_conflicts(
+        conflicts_result = await get_admin_service().get_binding_conflicts(
             chat_id=callback.message.chat.id,
             admin_id=admin_id
         )
@@ -268,7 +262,7 @@ async def admin_bulk_operations_callback(callback: CallbackQuery):
             return
         
         # Получаем статистику для массовых операций
-        queue_result = await admin_service.get_verification_queue(
+        queue_result = await get_admin_service().get_verification_queue(
             chat_id=callback.message.chat.id,
             admin_id=admin_id
         )
@@ -376,7 +370,7 @@ async def confirm_bulk_verify_all_callback(callback: CallbackQuery):
         )
         
         # Выполняем массовую верификацию
-        result = await admin_service.bulk_verify_bindings(
+        result = await get_admin_service().bulk_verify_bindings(
             chat_id=callback.message.chat.id,
             admin_id=admin_id
         )
@@ -451,7 +445,7 @@ async def bulk_verify_clan_members_callback(callback: CallbackQuery):
         
         # Выполняем верификацию с критериями
         criteria = {'auto_verify_clan_members': True}
-        result = await admin_service.bulk_verify_bindings(
+        result = await get_admin_service().bulk_verify_bindings(
             chat_id=callback.message.chat.id,
             admin_id=admin_id,
             criteria=criteria
@@ -511,7 +505,7 @@ async def binding_report_command(message: Message):
         )
         
         # Получаем детальную аналитику
-        analytics_result = await admin_service.get_binding_analytics(
+        analytics_result = await get_admin_service().get_binding_analytics(
             chat_id=message.chat.id,
             admin_id=message.from_user.id
         )
