@@ -15,6 +15,7 @@ from ..models.extended_clan_models import (
     DonationStats, ClanWarHistory, WarMember, WarAttack, CapitalRaidMember,
     CapitalRaidDistrict, CapitalRaidAttack
 )
+from ..utils.api_error_handler import api_request_handler
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,11 @@ class ExtendedClashAPI:
             tag = f"#{tag}"
         return quote(tag, safe='')
     
+    @api_request_handler(
+        logger,
+        ValueError,
+        base_message="Не удалось выполнить запрос к Clash of Clans API"
+    )
     async def _make_request(self, endpoint: str, params: Dict = None) -> Dict[str, Any]:
         """Выполнить запрос к API с обработкой ошибок и ротацией токенов"""
         url = f"{self.base_url}/{endpoint.lstrip('/')}"

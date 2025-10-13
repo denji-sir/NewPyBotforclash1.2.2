@@ -12,7 +12,7 @@ try:
 except ImportError:
     Bot = None
 
-from ..services.greeting_service import greeting_service
+from ..services.greeting_service import get_greeting_service
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class GreetingIntegration:
         
         try:
             # Инициализируем базу данных
-            await greeting_service.initialize_database()
+            await get_greeting_service().initialize_database()
             
             # Запускаем фоновые задачи
             await self._start_background_tasks()
@@ -52,7 +52,7 @@ class GreetingIntegration:
         # Задача обработки удаления сообщений
         if not self._deletion_processor_task or self._deletion_processor_task.done():
             self._deletion_processor_task = asyncio.create_task(
-                greeting_service.process_message_deletions()
+                get_greeting_service().process_message_deletions()
             )
             logger.info("Запущена задача обработки удаления сообщений")
         
@@ -71,7 +71,7 @@ class GreetingIntegration:
                 await asyncio.sleep(24 * 60 * 60)  # 24 часа
                 
                 # Очистка кэша
-                greeting_service.clear_cache()
+                get_greeting_service().clear_cache()
                 
                 # Здесь можно добавить другие задачи очистки
                 logger.info("Выполнена периодическая очистка системы приветствий")
@@ -100,7 +100,7 @@ class GreetingIntegration:
                     pass
             
             # Очищаем кэш
-            greeting_service.clear_cache()
+            get_greeting_service().clear_cache()
             
             logger.info("Система приветствий корректно завершена")
             
@@ -137,8 +137,8 @@ class GreetingIntegration:
         """Получение информации о приветствиях для чата"""
         
         try:
-            settings = await greeting_service.get_greeting_settings(chat_id)
-            stats = await greeting_service.get_greeting_stats(chat_id)
+            settings = await get_greeting_service().get_greeting_settings(chat_id)
+            stats = await get_greeting_service().get_greeting_stats(chat_id)
             
             return {
                 'enabled': settings.is_enabled,
@@ -160,7 +160,7 @@ class GreetingIntegration:
         """Предварительный просмотр приветствия"""
         
         try:
-            settings = await greeting_service.get_greeting_settings(chat_id)
+            settings = await get_greeting_service().get_greeting_settings(chat_id)
             
             if not settings.greeting_text:
                 return "Текст приветствия не установлен"
@@ -178,7 +178,7 @@ class GreetingIntegration:
         
         for chat_id in chat_ids:
             try:
-                success = await greeting_service.toggle_greeting(chat_id, admin_user_id, True)
+                success = await get_greeting_service().toggle_greeting(chat_id, admin_user_id, True)
                 
                 if success:
                     results['success'].append(chat_id)
@@ -197,7 +197,7 @@ class GreetingIntegration:
         try:
             import sqlite3
             
-            with sqlite3.connect(greeting_service.db_path) as conn:
+            with sqlite3.connect(get_greeting_service().db_path) as conn:
                 cursor = conn.cursor()
                 
                 # Общее количество чатов с настроенными приветствиями
@@ -241,7 +241,7 @@ class GreetingIntegration:
         """Экспорт настроек приветствий"""
         
         try:
-            settings = await greeting_service.get_greeting_settings(chat_id)
+            settings = await get_greeting_service().get_greeting_settings(chat_id)
             
             return {
                 'chat_id': settings.chat_id,
@@ -279,7 +279,7 @@ class GreetingIntegration:
                 if k in allowed_settings
             }
             
-            return await greeting_service.update_greeting_settings(
+            return await get_greeting_service().update_greeting_settings(
                 chat_id=chat_id,
                 admin_user_id=admin_user_id,
                 **filtered_settings
@@ -339,7 +339,7 @@ async def get_top_greeting_chats(limit: int = 10) -> list:
     try:
         import sqlite3
         
-        with sqlite3.connect(greeting_service.db_path) as conn:
+        with sqlite3.connect(get_greeting_service().db_path) as conn:
             cursor = conn.cursor()
             
             cursor.execute("""
@@ -372,7 +372,7 @@ async def get_greeting_activity_report(days: int = 30) -> dict:
         
         cutoff_date = datetime.now() - timedelta(days=days)
         
-        with sqlite3.connect(greeting_service.db_path) as conn:
+        with sqlite3.connect(get_greeting_service().db_path) as conn:
             cursor = conn.cursor()
             
             # Количество приветствий за период

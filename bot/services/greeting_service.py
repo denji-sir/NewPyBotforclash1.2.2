@@ -19,7 +19,17 @@ class GreetingService:
     """
     
     def __init__(self, db_path: str = "bot_data.db"):
-        # Извлекаем путь из database URL
+        # Кэш настроек для быстрого доступа
+        self._settings_cache: Dict[int, GreetingSettings] = {}
+        self._stats_cache: Dict[int, GreetingStats] = {}
+        
+        # Очередь для отложенного удаления сообщений
+        self._deletion_queue: asyncio.Queue = asyncio.Queue()
+        
+        self._update_database_path(db_path, reset_cache=False)
+    
+    def _update_database_path(self, db_path: str, *, reset_cache: bool = True):
+        """Обновление пути к базе данных с учетом URL"""
         if ':///' in db_path:
             self.db_path = db_path.split(':///')[-1]
         elif '://' in db_path:
@@ -27,12 +37,12 @@ class GreetingService:
         else:
             self.db_path = db_path
         
-        # Кэш настроек для быстрого доступа
-        self._settings_cache: Dict[int, GreetingSettings] = {}
-        self._stats_cache: Dict[int, GreetingStats] = {}
-        
-        # Очередь для отложенного удаления сообщений
-        self._deletion_queue: asyncio.Queue = asyncio.Queue()
+        if reset_cache:
+            self.clear_cache()
+    
+    def set_database_path(self, db_path: str):
+        """Установить новый путь к базе данных"""
+        self._update_database_path(db_path, reset_cache=True)
     
     async def initialize_database(self):
         """Инициализация таблиц базы данных"""
@@ -596,3 +606,14 @@ class GreetingService:
 
 # Создаем глобальный экземпляр сервиса
 greeting_service = GreetingService()
+
+
+def init_greeting_service(db_path: str) -> GreetingService:
+    """Инициализация глобального сервиса приветствий с заданным путем БД"""
+    greeting_service.set_database_path(db_path)
+    return greeting_service
+
+
+def get_greeting_service() -> GreetingService:
+    """Получение глобального сервиса приветствий"""
+    return greeting_service

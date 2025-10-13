@@ -2,15 +2,14 @@
 Главный модуль для инициализации системы кланов
 """
 import logging
-from pathlib import Path
 from typing import List
 from aiogram import Bot, Dispatcher
 
-from .services.database_init import init_clan_database
-from .services.coc_api_service import init_coc_api_service
-from .services.clan_database_service import init_clan_db_service
-from .services.permission_service import init_permission_service
-from .handlers.clan_commands import clan_router
+from .database_init import init_clan_database
+from .coc_api_service import init_coc_api_service
+from .clan_database_service import init_clan_db_service
+from .permission_service import init_permission_service
+from ..handlers.clan_commands import clan_router
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +63,8 @@ class ClanSystemManager:
             return {'status': 'not_initialized'}
         
         try:
-            from .services.database_init import DatabaseInitializer
-            from .services.coc_api_service import get_coc_api_service
+            from .database_init import DatabaseInitializer
+            from .coc_api_service import get_coc_api_service
             
             # Проверяем БД
             db_init = DatabaseInitializer(self.db_path)

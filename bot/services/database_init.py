@@ -63,6 +63,9 @@ class DatabaseInitializer:
             # Создаем таблицу статистики чата
             await self._create_chat_statistics_table(db)
             
+            # Создаем таблицы истории донатов
+            await self._create_donation_history_tables(db)
+            
             await db.commit()
             logger.info("Database initialized successfully")
     
@@ -586,6 +589,56 @@ class DatabaseInitializer:
         await db.execute("CREATE INDEX IF NOT EXISTS idx_chat_stats ON chat_statistics(chat_id, message_count DESC)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_statistics(chat_id, user_id)")
         logger.info("Created chat statistics table")
+    
+    async def _create_donation_history_tables(self, db: aiosqlite.Connection) -> None:
+        """Создание таблиц истории донатов"""
+        # Таблица истории донатов по месяцам
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS monthly_donation_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                clan_tag TEXT NOT NULL,
+                clan_name TEXT NOT NULL,
+                player_tag TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                donations INTEGER DEFAULT 0,
+                donations_received INTEGER DEFAULT 0,
+                donation_ratio REAL DEFAULT 0.0,
+                season_end_time TEXT NOT NULL,
+                archived_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                metadata TEXT DEFAULT '{}',
+                UNIQUE(clan_tag, player_tag, year, month)
+            )
+        """)
+        
+        # Таблица сводной статистики по сезонам
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS season_donation_summary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                clan_tag TEXT NOT NULL,
+                clan_name TEXT NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                total_donations INTEGER DEFAULT 0,
+                total_received INTEGER DEFAULT 0,
+                active_members INTEGER DEFAULT 0,
+                average_donations REAL DEFAULT 0.0,
+                top_donor_tag TEXT,
+                top_donor_name TEXT,
+                top_donor_amount INTEGER DEFAULT 0,
+                season_end_time TEXT NOT NULL,
+                archived_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                metadata TEXT DEFAULT '{}',
+                UNIQUE(clan_tag, year, month)
+            )
+        """)
+        
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_donation_history_clan ON monthly_donation_history(clan_tag, year, month)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_donation_history_player ON monthly_donation_history(player_tag, year, month)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_season_summary ON season_donation_summary(clan_tag, year, month)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_season_time ON season_donation_summary(season_end_time)")
+        logger.info("Created donation history tables")
     
     async def check_database_integrity(self) -> bool:
         """Проверка целостности базы данных"""

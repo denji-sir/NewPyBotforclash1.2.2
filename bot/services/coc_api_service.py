@@ -6,6 +6,7 @@ import asyncio
 from typing import List, Dict, Any, Optional
 import logging
 from ..models.clan_models import ClanData, ClanNotFound, ApiError, ApiRateLimited
+from ..utils.api_error_handler import api_request_handler
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,11 @@ class CocApiService:
         # Добавляем %23 для URL encoding
         return f"%23{tag}"
     
+    @api_request_handler(
+        logger,
+        ApiError,
+        base_message="Не удалось выполнить запрос к Clash of Clans API"
+    )
     async def _make_request(self, endpoint: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """Выполнить запрос к CoC API"""
         await self._ensure_session()
