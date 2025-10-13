@@ -441,5 +441,10 @@ def get_passport_db_service() -> PassportDatabaseService:
     """Получение экземпляра сервиса БД паспортов"""
     global _passport_db_service
     if _passport_db_service is None:
-        raise RuntimeError("Passport DB service not initialized. Call init_passport_db_service() first.")
+        # Автоинициализация в тестовом режиме
+        import os
+        if os.getenv("TESTING") == "1":
+            init_passport_db_service(":memory:")
+        else:
+            raise RuntimeError("Passport DB service not initialized. Call init_passport_db_service() first.")
     return _passport_db_service

@@ -52,10 +52,16 @@ class BotConfig:
             BotConfig: Конфигурация бота
         """
         
+        # Проверка тестового режима
+        is_testing = os.getenv("TESTING") == "1"
+        
         # Получаем токен бота
         bot_token = os.getenv('BOT_TOKEN')
         if not bot_token:
-            raise ValueError("Переменная окружения BOT_TOKEN не установлена")
+            if is_testing:
+                bot_token = "TEST_TOKEN_123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            else:
+                raise ValueError("Переменная окружения BOT_TOKEN не установлена")
         
         # Получаем токены Clash of Clans API
         clash_tokens = []

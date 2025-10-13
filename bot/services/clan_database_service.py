@@ -19,7 +19,15 @@ logger = logging.getLogger(__name__)
 class ClanDatabaseService:
     """Сервис для работы с кланами в базе данных"""
     
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str | None = None):
+        # По умолчанию используем :memory: для тестов
+        if db_path is None:
+            import os
+            if os.getenv("TESTING") == "1":
+                db_path = ":memory:"
+            else:
+                db_path = "./data/database/bot.db"
+        
         # Извлекаем путь из database URL (например, sqlite+aiosqlite:///./data/database/bot.db)
         if ':///' in db_path:
             self.db_path = db_path.split(':///')[-1]
@@ -51,10 +59,11 @@ class ClanDatabaseService:
                 await db.execute("PRAGMA foreign_keys = ON")
                 
                 # Проверяем что клан не зарегистрирован
-                existing = await db.fetchone(
+                cursor = await db.execute(
                     "SELECT id, chat_id FROM registered_clans WHERE clan_tag = ? AND is_active = 1",
                     (clan_data.tag,)
                 )
+                existing = await cursor.fetchone()
                 
                 if existing:
                     existing_chat = await self.get_chat_title(existing[1])
@@ -322,6 +331,52 @@ class ClanDatabaseService:
                 
         except Exception as e:
             logger.error(f"Error setting default clan {clan_id} for chat {chat_id}: {e}")
+            return False
+    
+    async def rename_clan_custom_name(self, clan_id: int, chat_id: int, new_name: str) -> bool:
+        """
+        Установить кастомное название клана для чата
+        
+        Args:
+            clan_id: ID клана
+            chat_id: ID чата
+            new_name: Новое название клана
+            
+        Returns:
+            bool: True если успешно, False иначе
+        """
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                # Проверяем что клан существует и принадлежит чату
+                cursor = await db.execute(
+                    "SELECT id, clan_metadata FROM registered_clans WHERE id = ? AND chat_id = ? AND is_active = 1",
+                    (clan_id, chat_id)
+                )
+                
+                row = await cursor.fetchone()
+                if not row:
+                    return False
+                
+                # Обновляем метаданные с кастомным именем
+                current_metadata = json.loads(row[1] or '{}')
+                current_metadata['custom_name'] = new_name
+                current_metadata['name_changed_at'] = datetime.now().isoformat()
+                
+                # Обновляем clan_name на кастомное имя
+                await db.execute("""
+                    UPDATE registered_clans SET
+                        clan_name = ?, 
+                        clan_metadata = ?,
+                        last_updated = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (new_name, json.dumps(current_metadata), clan_id))
+                
+                await db.commit()
+                logger.info(f"Renamed clan {clan_id} to '{new_name}' in chat {chat_id}")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error renaming clan {clan_id} to '{new_name}': {e}")
             return False
     
     async def get_chat_title(self, chat_id: int) -> str:
