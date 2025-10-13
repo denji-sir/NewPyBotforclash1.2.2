@@ -8,6 +8,59 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+async def get_clan_from_args(db_service, chat_id: int, args: Optional[str] = None):
+    """
+    Получить клан по аргументу команды (номер или первые буквы названия)
+    
+    Args:
+        db_service: Сервис базы данных
+        chat_id: ID чата
+        args: Аргумент команды (номер или первые буквы названия)
+        
+    Returns:
+        ClanInfo или None
+        
+    Examples:
+        - get_clan_from_args(db, 123, None) -> основной клан
+        - get_clan_from_args(db, 123, "2") -> клан №2
+        - get_clan_from_args(db, 123, "wa") -> клан "Warriors"
+    """
+    # Получаем все кланы чата
+    clans = await db_service.get_chat_clans(chat_id)
+    
+    if not clans:
+        return None
+    
+    # Если аргумент не указан - возвращаем основной клан
+    if not args or args.strip() == "":
+        settings = await db_service.get_chat_settings(chat_id)
+        if settings and settings.default_clan_id:
+            # Ищем клан по ID
+            for clan in clans:
+                if clan.id == settings.default_clan_id:
+                    return clan
+        # Если основной не установлен, возвращаем первый
+        return clans[0]
+    
+    args = args.strip()
+    
+    # Проверяем, является ли аргумент номером
+    if args.isdigit():
+        clan_number = int(args)
+        if 1 <= clan_number <= len(clans):
+            return clans[clan_number - 1]
+        return None
+    
+    # Проверяем по первым буквам названия (регистронезависимо)
+    args_lower = args.lower()
+    for clan in clans:
+        if clan.clan_name.lower().startswith(args_lower):
+            return clan
+    
+    # Не найдено
+    return None
+
+
 def calculate_clan_activity_score(members: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Рассчитывает показатель активности клана на основе участников
@@ -303,6 +356,27 @@ def generate_clan_comparison(clan1_data: Dict[str, Any], clan2_data: Dict[str, A
 """
     
     return comparison.strip()
+
+
+def format_clan_selector_text(clans: List[Dict[str, Any]]) -> str:
+    """
+    Форматирует текст с предложением выбрать клан из списка.
+    
+    Args:
+        clans: Список кланов.
+        
+    Returns:
+        Отформартированный текст.
+    """
+    if not clans:
+        return "Нет доступных кланов для выбора."
+    
+    text = "**Выберите клан, указав его номер:**\n\n"
+    for i, clan in enumerate(clans, 1):
+        text += f"**{i}.** {clan.get('clan_name', 'Без имени')} (`{clan.get('clan_tag', '')}`)\n"
+    
+    text += "\nНапример: `/war 1`"
+    return text
 
 
 def get_clan_recruitment_message(clan_data: Dict[str, Any], activity_data: Dict[str, Any]) -> str:

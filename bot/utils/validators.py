@@ -337,3 +337,57 @@ def format_role_name(role: str) -> str:
         'member': 'Участник'
     }
     return role_names.get(role, 'Участник')
+
+
+def validate_player_tag(player_tag: str) -> Tuple[bool, Optional[str]]:
+    """
+    Валидация тега игрока (использует ту же логику что и для клана)
+    
+    Args:
+        player_tag: Тег игрока для проверки
+        
+    Returns:
+        Tuple[bool, Optional[str]]: (is_valid, error_message)
+    """
+    if not player_tag:
+        return False, "Тег игрока не может быть пустым"
+    
+    # Убираем пробелы
+    player_tag = player_tag.strip()
+    
+    if len(player_tag) < 4:
+        return False, "Тег игрока слишком короткий (минимум 4 символа с #)"
+    
+    if len(player_tag) > 11:
+        return False, "Тег игрока слишком длинный (максимум 10 символов без #)"
+    
+    if not player_tag.startswith('#'):
+        return False, "Тег игрока должен начинаться с символа #"
+    
+    # Проверяем символы (CoC использует специальный набор символов)
+    pattern = re.compile(r'^#?[0289PYLQGRJCUV]{3,10}$')
+    if not pattern.match(player_tag.upper()):
+        return False, "Тег содержит недопустимые символы"
+    
+    return True, None
+
+
+def normalize_player_tag(player_tag: str) -> str:
+    """
+    Нормализация тега игрока
+    
+    Args:
+        player_tag: Исходный тег
+        
+    Returns:
+        str: Нормализованный тег в верхнем регистре с #
+    """
+    if not player_tag:
+        return ""
+    
+    player_tag = player_tag.strip().upper()
+    
+    if not player_tag.startswith('#'):
+        player_tag = '#' + player_tag
+    
+    return player_tag
