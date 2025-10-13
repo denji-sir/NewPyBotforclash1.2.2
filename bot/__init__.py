@@ -13,8 +13,7 @@ from .config import load_config
 from .services import (
     ClashOfClansAPI,
     DatabaseService, 
-    PassportSystem,
-    NotificationService
+    PassportSystem
 )
 
 settings = load_config()
@@ -26,6 +25,5 @@ __all__ = [
     "settings",
     "ClashOfClansAPI",
     "DatabaseService",
-    "PassportSystem", 
-    "NotificationService"
+    "PassportSystem"
 ]

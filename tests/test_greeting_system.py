@@ -364,9 +364,10 @@ class TestGreetingIntegration(unittest.IsolatedAsyncioTestCase):
         self.mock_bot = Mock()
         
         # Создаем сервис с временной БД
-        from bot.services.greeting_service import greeting_service
-        greeting_service.db_path = self.temp_db.name
-        await greeting_service.initialize_database()
+        from bot.services.greeting_service import get_greeting_service
+        service = get_greeting_service()
+        service.set_database_path(self.temp_db.name)
+        await service.initialize_database()
         
         # Импортируем интеграцию после настройки сервиса
         from bot.integrations.greeting_integration import greeting_integration
@@ -403,10 +404,12 @@ class TestGreetingIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_preview_greeting(self):
         """Тест предварительного просмотра приветствия"""
         
-        from bot.services.greeting_service import greeting_service
+        from bot.services.greeting_service import get_greeting_service
+        
+        service = get_greeting_service()
         
         # Устанавливаем текст приветствия
-        await greeting_service.set_greeting_text(
+        await service.set_greeting_text(
             chat_id=12345,
             admin_user_id=67890,
             text="Привет, {first_name}!"
@@ -457,9 +460,10 @@ class TestGreetingCommands(unittest.IsolatedAsyncioTestCase):
         self.temp_db = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
         self.temp_db.close()
         
-        from bot.services.greeting_service import greeting_service
-        greeting_service.db_path = self.temp_db.name
-        await greeting_service.initialize_database()
+        from bot.services.greeting_service import get_greeting_service
+        service = get_greeting_service()
+        service.set_database_path(self.temp_db.name)
+        await service.initialize_database()
     
     async def asyncTearDown(self):
         """Очистка после тестов команд"""
