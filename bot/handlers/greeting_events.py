@@ -9,11 +9,15 @@ from aiogram.types import Message, ChatMemberUpdated, InlineKeyboardButton, Inli
 from aiogram.filters import ChatMemberUpdatedFilter, IS_MEMBER, IS_NOT_MEMBER
 from typing import Optional
 
-from ..services.greeting_service import greeting_service
+from ..services.greeting_service import get_greeting_service, GreetingService
 
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+def gs() -> GreetingService:
+    """Короткий доступ к сервису приветствий"""
+    return get_greeting_service()
 
 
 # Обработчик новых участников
@@ -33,7 +37,7 @@ async def on_new_member_join(event: ChatMemberUpdated):
             return
         
         # Получаем данные для приветствия
-        greeting_data = await greeting_service.handle_new_member(
+        greeting_data = await gs().handle_new_member(
             chat_id=chat.id,
             user_id=new_member.id,
             username=new_member.username or "",
@@ -87,7 +91,7 @@ async def send_greeting_message(event: ChatMemberUpdated, new_member, greeting_d
         )
         
         # Обновляем ID сообщения в истории
-        await greeting_service.update_greeting_message_id(
+        await gs().update_greeting_message_id(
             chat_id=chat_id,
             user_id=new_member.id,
             message_id=sent_message.message_id
@@ -96,7 +100,7 @@ async def send_greeting_message(event: ChatMemberUpdated, new_member, greeting_d
         # Планируем удаление сообщения (если настроено)
         delete_after = greeting_data.get('delete_after')
         if delete_after and delete_after > 0:
-            await greeting_service.schedule_message_deletion(
+            await gs().schedule_message_deletion(
                 chat_id=chat_id,
                 message_id=sent_message.message_id,
                 delay_seconds=delete_after
@@ -139,7 +143,7 @@ async def track_new_member_response(message: Message):
         # (в течение последних 24 часов по истории приветствий)
         
         # Получаем историю приветствий
-        history = await greeting_service.get_greeting_history(message.chat.id, 50)
+        history = await gs().get_greeting_history(message.chat.id, 50)
         
         # Ищем запись о приветствии этого пользователя за последние 24 часа
         from datetime import datetime, timedelta
@@ -152,7 +156,7 @@ async def track_new_member_response(message: Message):
                 not entry['user_responded']):
                 
                 # Отмечаем, что пользователь ответил
-                await greeting_service.mark_user_responded(
+                await gs().mark_user_responded(
                     chat_id=message.chat.id,
                     user_id=message.from_user.id
                 )
@@ -225,7 +229,7 @@ async def on_bot_added_to_group(message: Message):
                 logger.info(f"Бот добавлен в группу {message.chat.id} ({message.chat.title})")
                 
                 # Инициализируем настройки приветствий для новой группы
-                await greeting_service.get_greeting_settings(message.chat.id)
+                await gs().get_greeting_settings(message.chat.id)
                 
                 # Отправляем приветственное сообщение о возможностях бота
                 welcome_text = """🤖 **Привет! Я добавлен в вашу группу!**

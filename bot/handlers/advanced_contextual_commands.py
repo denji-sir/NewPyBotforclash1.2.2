@@ -17,8 +17,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..services.user_context_service import UserContextService, UserContext, UserContextType, ActivityLevel, ExperienceLevel
 from ..services.passport_database_service import PassportDatabaseService
 from ..services.clan_database_service import ClanDatabaseService
-from ..services.clash_api_service import ClashAPIService
-from ..ui.formatting import create_progress_bar, format_user_profile, format_clan_info
+from ..services.extended_clash_api import ExtendedClashAPI
+from ..utils.formatting import create_progress_bar, format_player_info, format_clan_info
 from ..handlers.contextual_commands import ContextualCommandSystem
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class AdvancedContextualHandlers:
         self.context_service = UserContextService()
         self.passport_service = PassportDatabaseService()
         self.clan_service = ClanDatabaseService()
-        self.clash_api = ClashAPIService()
+        self.clash_api = ExtendedClashAPI([])
         self.command_system = ContextualCommandSystem()
     
     async def handle_personal_dashboard(self, message: Message, context: UserContext):
@@ -241,7 +241,7 @@ class AdvancedContextualHandlers:
             })
         
         # Элементы для администраторов
-        if context.context_type == UserContextType.ADMIN:
+        if context.context_type == UserContextType.ADMIN_USER:
             items.append({
                 'title': '⚡ Администрирование',
                 'action': 'admin_panel',
@@ -617,7 +617,7 @@ class AdvancedContextualHandlers:
             return "👋 Добро пожаловать в наше сообщество!"
         elif context.context_type == UserContextType.CLAN_LEADER:
             return "👑 Добро пожаловать, лидер!"
-        elif context.context_type == UserContextType.ADMIN:
+        elif context.context_type == UserContextType.ADMIN_USER:
             return "⚡ Добро пожаловать, администратор!"
         elif context.is_clan_member:
             return f"🏰 Добро пожаловать, {context.clan_membership.clan_name}!"
@@ -637,7 +637,7 @@ class AdvancedContextualHandlers:
             return "Верифицированный участник"
         elif context.context_type == UserContextType.CLAN_LEADER:
             return "Лидер клана"
-        elif context.context_type == UserContextType.ADMIN:
+        elif context.context_type == UserContextType.ADMIN_USER:
             return "Администратор"
         else:
             return "Участник"

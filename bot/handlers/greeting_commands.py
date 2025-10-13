@@ -10,14 +10,20 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from typing import Optional
 
-from ..services.greeting_service import greeting_service
+from ..services.greeting_service import get_greeting_service, GreetingService
 from ..utils.keyboards import create_inline_keyboard
 from ..utils.permissions import is_admin, is_group_admin
 from ..utils.formatters import format_user_mention
+from ..utils.error_handler import error_handler
 
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+
+def gs() -> GreetingService:
+    """Короткий доступ к сервису приветствий"""
+    return get_greeting_service()
 
 
 class GreetingStates(StatesGroup):
@@ -27,9 +33,95 @@ class GreetingStates(StatesGroup):
     waiting_for_delete_delay = State()
 
 
+# Команда /start
+@router.message(Command("start"))
+@error_handler
+async def cmd_start(message: Message):
+    """Команда /start - приветствие бота"""
+    
+    welcome_text = """
+🤖 **Добро пожаловать в бота Clash of Clans!**
+
+Я помогу вам управлять кланами и получать информацию из Clash of Clans.
+
+**Основные команды:**
+• `/commands` - список всех доступных команд
+• `/clan_info` - информация о клане
+• `/clan_members` - список участников клана
+• `/greeting` - настройка приветствий (для групп)
+
+**Для начала работы:**
+1. Добавьте меня в группу
+2. Используйте команды для получения информации о кланах
+
+Бот: @aftcocestingbot
+"""
+    
+    await message.reply(welcome_text, parse_mode="Markdown")
+
+
+@router.message(Command("commands"))
+@error_handler
+async def cmd_commands(message: Message):
+    """Команда /commands - список всех команд бота"""
+    
+    commands_text = """
+📋 **Все доступные команды бота**
+
+🏰 **УПРАВЛЕНИЕ КЛАНАМИ** (только админы):
+• `/register_clan #TAG` - зарегистрировать клан
+• `/clan_list` - список всех кланов чата
+• `/set_default_clan <номер>` - установить основной клан
+• `/rename_clan <номер> <название>` - переименовать клан
+• `/update_clan [номер]` - обновить данные клана
+• `/clan_info [номер]` - информация о клане
+• `/clan_members [номер]` - участники клана
+
+📊 **СТАТИСТИКА КЛАНОВ**:
+• `/war [номер|буквы]` - информация о войне клана
+• `/raids [номер|буквы]` - капитальные рейды
+• `/cwl [номер|буквы]` - Лига Военных Кланов
+• `/leadership [номер|буквы]` - руководство клана
+• `/top_donors [номер|буквы]` - топ донатеров
+
+💡 **Примеры использования:**
+  `/war` - война основного клана
+  `/war 2` - война клана №2
+  `/raids фа` - рейды клана по буквам
+
+📝 **ПАСПОРТА**:
+• `/create_passport` - создать паспорт
+• `/passport` - мой паспорт
+• `/edit_passport` - редактировать паспорт
+• `/plist` - список всех паспортов
+• `/dpassport` - удалить паспорт
+
+🔗 **ПРИВЯЗКА ИГРОКОВ**:
+• `/bind #TAG` - привязать игрока
+• `/mybindings` - мои привязки
+• `/verify_player` - верифицировать игрока (админ)
+
+🤝 **ПРИВЕТСТВИЯ** (только админы):
+• `/greeting` - настройка приветствий
+• `/greeting_on` - включить приветствия
+• `/greeting_off` - выключить приветствия
+
+ℹ️ **ИНФОРМАЦИЯ**:
+• `/start` - приветствие бота
+• `/commands` - этот список команд
+
+📖 **Полное руководство:** используйте команды выше для получения подробных инструкций.
+
+💡 **Подсказка:** В командах статистики можно указывать номер клана или первые буквы названия!
+"""
+    
+    await message.reply(commands_text, parse_mode="Markdown")
+
+
 # Основная команда настройки приветствий
 
 @router.message(Command("greeting"))
+@error_handler
 async def cmd_greeting(message: Message, state: FSMContext):
     """Основная команда управления приветствиями"""
     
@@ -39,15 +131,15 @@ async def cmd_greeting(message: Message, state: FSMContext):
         return
     
     # Проверяем права администратора
-    if not await is_group_admin(message.from_user.id, message.chat.id, message.bot):
+    if not await is_group_admin(user_id=message.from_user.id, chat_id=message.chat.id, bot=message.bot):
         await message.reply("❌ Только администраторы могут управлять приветствиями!")
         return
     
     await state.clear()
     
     # Получаем текущие настройки
-    settings = await greeting_service.get_greeting_settings(message.chat.id)
-    stats = await greeting_service.get_greeting_stats(message.chat.id)
+    settings = await gs().get_greeting_settings(message.chat.id)
+    stats = await gs().get_greeting_stats(message.chat.id)
     
     # Формируем информацию о текущих настройках
     status_emoji = "✅" if settings.is_enabled else "❌"
@@ -107,7 +199,7 @@ async def handle_greeting_callbacks(callback: CallbackQuery, state: FSMContext):
     """Обработка callback-запросов приветствий"""
     
     # Проверяем права
-    if not await is_group_admin(callback.from_user.id, callback.message.chat.id, callback.bot):
+    if not await is_group_admin(user_id=callback.from_user.id, chat_id=callback.message.chat.id, bot=callback.bot):
         await callback.answer("❌ Недостаточно прав!", show_alert=True)
         return
     
@@ -145,14 +237,14 @@ async def toggle_greeting_status(callback: CallbackQuery, enabled: bool):
     chat_id = callback.message.chat.id
     user_id = callback.from_user.id
     
-    success = await greeting_service.toggle_greeting(chat_id, user_id, enabled)
+    success = await gs().toggle_greeting(chat_id, user_id, enabled)
     
     if success:
         status_text = "включены" if enabled else "выключены"
         await callback.answer(f"✅ Приветствия {status_text}!", show_alert=True)
         
         # Обновляем сообщение
-        settings = await greeting_service.get_greeting_settings(chat_id)
+        settings = await gs().get_greeting_settings(chat_id)
         keyboard = create_greeting_main_keyboard(settings.is_enabled)
         
         # Обновляем текст сообщения
@@ -194,7 +286,7 @@ async def process_greeting_text(message: Message, state: FSMContext):
     """Обработка введенного текста приветствия"""
     
     # Проверяем права
-    if not await is_group_admin(message.from_user.id, message.chat.id, message.bot):
+    if not await is_group_admin(user_id=message.from_user.id, chat_id=message.chat.id, bot=message.bot):
         await message.reply("❌ Недостаточно прав!")
         return
     
@@ -205,7 +297,7 @@ async def process_greeting_text(message: Message, state: FSMContext):
         return
     
     # Сохраняем новый текст
-    success = await greeting_service.set_greeting_text(
+    success = await gs().set_greeting_text(
         chat_id=message.chat.id,
         admin_user_id=message.from_user.id,
         text=new_text
@@ -215,7 +307,7 @@ async def process_greeting_text(message: Message, state: FSMContext):
         await message.reply("✅ Текст приветствия обновлен!")
         
         # Показываем пример
-        example = await greeting_service.get_greeting_settings(message.chat.id)
+        example = await gs().get_greeting_settings(message.chat.id)
         formatted_example = example.format_greeting_for_user(
             first_name="Пример",
             username="example_user"
@@ -234,7 +326,7 @@ async def process_greeting_text(message: Message, state: FSMContext):
 async def show_greeting_templates(callback: CallbackQuery):
     """Показ доступных шаблонов приветствий"""
     
-    templates = greeting_service.get_greeting_templates()
+    templates = gs().get_greeting_templates()
     
     text = "🎨 **Выберите шаблон приветствия:**\n\n"
     
@@ -264,13 +356,13 @@ async def apply_greeting_template(callback: CallbackQuery):
     """Применение шаблона приветствия"""
     
     # Проверяем права
-    if not await is_group_admin(callback.from_user.id, callback.message.chat.id, callback.bot):
+    if not await is_group_admin(user_id=callback.from_user.id, chat_id=callback.message.chat.id, bot=callback.bot):
         await callback.answer("❌ Недостаточно прав!", show_alert=True)
         return
     
     template_name = callback.data.split("_", 1)[1]
     
-    success = await greeting_service.apply_greeting_template(
+    success = await gs().apply_greeting_template(
         chat_id=callback.message.chat.id,
         admin_user_id=callback.from_user.id,
         template_name=template_name
@@ -288,7 +380,7 @@ async def apply_greeting_template(callback: CallbackQuery):
 async def show_advanced_settings(callback: CallbackQuery):
     """Показ дополнительных настроек"""
     
-    settings = await greeting_service.get_greeting_settings(callback.message.chat.id)
+    settings = await gs().get_greeting_settings(callback.message.chat.id)
     
     text = f"""⚙️ **Дополнительные настройки**
 
@@ -327,17 +419,17 @@ async def handle_advanced_settings(callback: CallbackQuery, state: FSMContext):
     """Обработка дополнительных настроек"""
     
     # Проверяем права
-    if not await is_group_admin(callback.from_user.id, callback.message.chat.id, callback.bot):
+    if not await is_group_admin(user_id=callback.from_user.id, chat_id=callback.message.chat.id, bot=callback.bot):
         await callback.answer("❌ Недостаточно прав!", show_alert=True)
         return
     
     setting = callback.data.split("_", 1)[1]
-    settings = await greeting_service.get_greeting_settings(callback.message.chat.id)
+    settings = await gs().get_greeting_settings(callback.message.chat.id)
     
     if setting == "mention":
         # Переключаем упоминание
         new_value = not settings.mention_user
-        success = await greeting_service.update_greeting_settings(
+        success = await gs().update_greeting_settings(
             chat_id=callback.message.chat.id,
             admin_user_id=callback.from_user.id,
             mention_user=new_value
@@ -369,7 +461,7 @@ async def handle_advanced_settings(callback: CallbackQuery, state: FSMContext):
         # Настройка кнопки правил
         if settings.show_rules_button:
             # Выключаем кнопку правил
-            success = await greeting_service.update_greeting_settings(
+            success = await gs().update_greeting_settings(
                 chat_id=callback.message.chat.id,
                 admin_user_id=callback.from_user.id,
                 show_rules_button=False
@@ -396,7 +488,7 @@ async def process_delete_delay(message: Message, state: FSMContext):
     """Обработка времени автоудаления"""
     
     # Проверяем права
-    if not await is_group_admin(message.from_user.id, message.chat.id, message.bot):
+    if not await is_group_admin(user_id=message.from_user.id, chat_id=message.chat.id, bot=message.bot):
         await message.reply("❌ Недостаточно прав!")
         return
     
@@ -408,7 +500,7 @@ async def process_delete_delay(message: Message, state: FSMContext):
             return
         
         # Сохраняем настройку
-        success = await greeting_service.update_greeting_settings(
+        success = await gs().update_greeting_settings(
             chat_id=message.chat.id,
             admin_user_id=message.from_user.id,
             delete_after_seconds=delay if delay > 0 else None
@@ -434,7 +526,7 @@ async def process_rules_text(message: Message, state: FSMContext):
     """Обработка текста правил"""
     
     # Проверяем права
-    if not await is_group_admin(message.from_user.id, message.chat.id, message.bot):
+    if not await is_group_admin(user_id=message.from_user.id, chat_id=message.chat.id, bot=message.bot):
         await message.reply("❌ Недостаточно прав!")
         return
     
@@ -445,7 +537,7 @@ async def process_rules_text(message: Message, state: FSMContext):
         return
     
     # Сохраняем правила и включаем кнопку
-    success = await greeting_service.update_greeting_settings(
+    success = await gs().update_greeting_settings(
         chat_id=message.chat.id,
         admin_user_id=message.from_user.id,
         show_rules_button=True,
@@ -463,10 +555,10 @@ async def process_rules_text(message: Message, state: FSMContext):
 async def show_greeting_statistics(callback: CallbackQuery):
     """Показ статистики приветствий"""
     
-    stats = await greeting_service.get_greeting_stats(callback.message.chat.id)
+    stats = await gs().get_greeting_stats(callback.message.chat.id)
     
     # Получаем историю
-    history = await greeting_service.get_greeting_history(callback.message.chat.id, 10)
+    history = await gs().get_greeting_history(callback.message.chat.id, 10)
     
     text = f"""📊 **Статистика приветствий**
 
@@ -505,8 +597,8 @@ async def cmd_greeting_refresh(callback: CallbackQuery):
     """Возврат к главному меню приветствий"""
     
     # Получаем обновленные настройки
-    settings = await greeting_service.get_greeting_settings(callback.message.chat.id)
-    stats = await greeting_service.get_greeting_stats(callback.message.chat.id)
+    settings = await gs().get_greeting_settings(callback.message.chat.id)
+    stats = await gs().get_greeting_stats(callback.message.chat.id)
     
     # Формируем текст как в основной команде
     status_emoji = "✅" if settings.is_enabled else "❌"
@@ -540,6 +632,7 @@ async def cmd_greeting_refresh(callback: CallbackQuery):
 # Команды быстрого управления
 
 @router.message(Command("greeting_on"))
+@error_handler
 async def cmd_greeting_on(message: Message):
     """Быстрое включение приветствий"""
     
@@ -547,11 +640,11 @@ async def cmd_greeting_on(message: Message):
         await message.reply("❌ Эта команда работает только в группах!")
         return
     
-    if not await is_group_admin(message.from_user.id, message.chat.id, message.bot):
+    if not await is_group_admin(user_id=message.from_user.id, chat_id=message.chat.id, bot=message.bot):
         await message.reply("❌ Только администраторы могут управлять приветствиями!")
         return
     
-    success = await greeting_service.toggle_greeting(
+    success = await gs().toggle_greeting(
         chat_id=message.chat.id,
         admin_user_id=message.from_user.id,
         enabled=True
@@ -564,6 +657,7 @@ async def cmd_greeting_on(message: Message):
 
 
 @router.message(Command("greeting_off"))
+@error_handler
 async def cmd_greeting_off(message: Message):
     """Быстрое выключение приветствий"""
     
@@ -571,11 +665,11 @@ async def cmd_greeting_off(message: Message):
         await message.reply("❌ Эта команда работает только в группах!")
         return
     
-    if not await is_group_admin(message.from_user.id, message.chat.id, message.bot):
+    if not await is_group_admin(user_id=message.from_user.id, chat_id=message.chat.id, bot=message.bot):
         await message.reply("❌ Только администраторы могут управлять приветствиями!")
         return
     
-    success = await greeting_service.toggle_greeting(
+    success = await gs().toggle_greeting(
         chat_id=message.chat.id,
         admin_user_id=message.from_user.id,
         enabled=False
@@ -609,7 +703,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
 async def show_chat_rules(callback: CallbackQuery):
     """Показ правил чата"""
     
-    settings = await greeting_service.get_greeting_settings(callback.message.chat.id)
+    settings = await gs().get_greeting_settings(callback.message.chat.id)
     
     if settings.rules_text:
         await callback.answer(settings.rules_text, show_alert=True)

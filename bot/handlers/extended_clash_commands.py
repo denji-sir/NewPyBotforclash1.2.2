@@ -15,7 +15,9 @@ from ..services.clan_database_service import ClanDatabaseService
 from ..models.extended_clan_models import (
     WarState, MemberRole, war_state_to_emoji, role_to_emoji, format_duration
 )
-from ..utils.formatters import format_large_number
+from ..utils.clan_helpers import get_clan_from_args, format_clan_selector_text
+from ..utils.formatters import format_war_info, format_raid_info, format_cwl_info
+from ..utils.error_handler import error_handler
 
 logger = logging.getLogger(__name__)
 
@@ -576,30 +578,33 @@ def format_cwl_info(cwl_info) -> str:
 # Дополнительные команды
 
 @extended_router.message(Command("war"))
+@error_handler
 async def cmd_current_war(message: Message, command: CommandObject):
     """Текущая война клана"""
     
-    clan_tag = command.args.strip() if command.args else None
+    # Получаем клан по аргументу (номер/буквы) или основной
+    clan = await get_clan_from_args(db_service, message.chat.id, command.args)
     
-    if not clan_tag:
-        # Пытаемся получить привязанный клан
-        try:
-            registered_clans = await db_service.get_chat_clans(message.chat.id)
-            if registered_clans:
-                clan_tag = registered_clans[0].clan_tag
-        except:
-            pass
-    
-    if not clan_tag:
-        await message.reply("❌ Укажите тег клана: `/war #CLANTAG`")
+    if not clan:
+        await message.reply(
+            "❌ Клан не найден!\n\n"
+            "Используйте:\n"
+            "• `/war` - основной клан\n"
+            "• `/war 2` - клан №2\n"
+            "• `/war wa` - клан по первым буквам\n"
+            "• `/clan_list` - список кланов"
+        )
         return
+    
+    clan_tag = clan.clan_tag
+    clan_name = clan.clan_name
     
     try:
         async with extended_api:
             war_info = await extended_api.get_current_war(clan_tag)
         
         if not war_info:
-            await message.reply(f"✅ Клан `{clan_tag}` не участвует в войне")
+            await message.reply(f"✅ Клан **{clan_name}** `{clan_tag}` не участвует в войне")
             return
         
         text = format_war_info(war_info)
@@ -611,23 +616,25 @@ async def cmd_current_war(message: Message, command: CommandObject):
 
 
 @extended_router.message(Command("raids"))
+@error_handler
 async def cmd_capital_raids(message: Message, command: CommandObject):
     """Капитальные рейды клана"""
     
-    clan_tag = command.args.strip() if command.args else None
+    # Получаем клан по аргументу (номер/буквы) или основной
+    clan = await get_clan_from_args(db_service, message.chat.id, command.args)
     
-    if not clan_tag:
-        # Пытаемся получить привязанный клан
-        try:
-            registered_clans = await db_service.get_chat_clans(message.chat.id)
-            if registered_clans:
-                clan_tag = registered_clans[0].clan_tag
-        except:
-            pass
-    
-    if not clan_tag:
-        await message.reply("❌ Укажите тег клана: `/raids #CLANTAG`")
+    if not clan:
+        await message.reply(
+            "❌ Клан не найден!\n\n"
+            "Используйте:\n"
+            "• `/raids` - основной клан\n"
+            "• `/raids 2` - клан №2\n"
+            "• `/raids wa` - клан по первым буквам\n"
+            "• `/clan_list` - список кланов"
+        )
         return
+    
+    clan_tag = clan.clan_tag
     
     try:
         async with extended_api:
@@ -642,23 +649,25 @@ async def cmd_capital_raids(message: Message, command: CommandObject):
 
 
 @extended_router.message(Command("leadership"))
+@error_handler
 async def cmd_leadership(message: Message, command: CommandObject):
     """Руководство клана"""
     
-    clan_tag = command.args.strip() if command.args else None
+    # Получаем клан по аргументу (номер/буквы) или основной
+    clan = await get_clan_from_args(db_service, message.chat.id, command.args)
     
-    if not clan_tag:
-        # Пытаемся получить привязанный клан
-        try:
-            registered_clans = await db_service.get_chat_clans(message.chat.id)
-            if registered_clans:
-                clan_tag = registered_clans[0].clan_tag
-        except:
-            pass
-    
-    if not clan_tag:
-        await message.reply("❌ Укажите тег клана: `/leadership #CLANTAG`")
+    if not clan:
+        await message.reply(
+            "❌ Клан не найден!\n\n"
+            "Используйте:\n"
+            "• `/leadership` - основной клан\n"
+            "• `/leadership 2` - клан №2\n"
+            "• `/leadership wa` - клан по первым буквам\n"
+            "• `/clan_list` - список кланов"
+        )
         return
+    
+    clan_tag = clan.clan_tag
     
     try:
         async with extended_api:
@@ -673,23 +682,25 @@ async def cmd_leadership(message: Message, command: CommandObject):
 
 
 @extended_router.message(Command("top_donors"))
+@error_handler
 async def cmd_top_donors(message: Message, command: CommandObject):
     """Топ донатеров клана за текущий месяц"""
     
-    clan_tag = command.args.strip() if command.args else None
+    # Получаем клан по аргументу (номер/буквы) или основной
+    clan = await get_clan_from_args(db_service, message.chat.id, command.args)
     
-    if not clan_tag:
-        # Пытаемся получить привязанный клан
-        try:
-            registered_clans = await db_service.get_chat_clans(message.chat.id)
-            if registered_clans:
-                clan_tag = registered_clans[0].clan_tag
-        except:
-            pass
-    
-    if not clan_tag:
-        await message.reply("❌ Укажите тег клана: `/top_donors #CLANTAG`")
+    if not clan:
+        await message.reply(
+            "❌ Клан не найден!\n\n"
+            "Используйте:\n"
+            "• `/top_donors` - основной клан\n"
+            "• `/top_donors 2` - клан №2\n"
+            "• `/top_donors wa` - клан по первым буквам\n"
+            "• `/clan_list` - список кланов"
+        )
         return
+    
+    clan_tag = clan.clan_tag
     
     try:
         async with extended_api:

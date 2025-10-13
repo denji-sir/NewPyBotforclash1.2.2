@@ -15,10 +15,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from ..services.achievement_service import AchievementService
 from ..models.achievement_models import (
     AchievementCategory, AchievementDifficulty, AchievementStatus,
-    Achievement, UserAchievementProgress, UserProfile
+    Achievement, UserAchievementProgress, UserProfile, AchievementRequirement
 )
 from ..services.user_context_service import UserContext
-from ..ui.formatting import create_progress_bar
+from ..utils.formatting import create_progress_bar
 
 logger = logging.getLogger(__name__)
 router = Router()

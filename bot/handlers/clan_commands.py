@@ -19,6 +19,7 @@ from ..services.permission_service import get_permission_service
 from ..utils.validators import validate_clan_tag, format_number, format_date
 from ..utils.clan_helpers import format_member_list, get_clan_recruitment_message
 from ..utils.clan_analysis_manager import get_clan_analysis_manager
+from ..utils.error_handler import error_handler
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ def format_number(num: int) -> str:
 
 
 @clan_router.message(Command("register_clan"))
+@error_handler
 async def register_clan_command(message: Message, command: CommandObject):
     """
     Регистрация клана в чате
@@ -190,6 +192,7 @@ async def register_clan_command(message: Message, command: CommandObject):
 
 
 @clan_router.message(Command("clan_list"))
+@error_handler
 async def clan_list_command(message: Message):
     """Показать список зарегистрированных кланов в чате"""
     try:
@@ -240,6 +243,7 @@ async def clan_list_command(message: Message):
             f"💡 **Доступные команды:**\n"
             f"• `/clan_info <номер>` - подробная информация\n"
             f"• `/set_default_clan <номер>` - установить основной\n"
+            f"• `/rename_clan <номер> <название>` - переименовать клан\n"
             f"• `/update_clan <номер>` - обновить данные из CoC API"
         )
         
@@ -254,6 +258,7 @@ async def clan_list_command(message: Message):
 
 
 @clan_router.message(Command("clan_info"))
+@error_handler
 async def clan_info_command(message: Message, command: CommandObject):
     """
     Показать информацию о клане
@@ -369,6 +374,7 @@ async def clan_info_command(message: Message, command: CommandObject):
 
 
 @clan_router.message(Command("set_default_clan"))
+@error_handler
 async def set_default_clan_command(message: Message, command: CommandObject):
     """
     Установить основной клан чата
@@ -461,7 +467,144 @@ async def set_default_clan_command(message: Message, command: CommandObject):
         )
 
 
+@clan_router.message(Command("rename_clan"))
+@error_handler
+async def rename_clan_command(message: Message, command: CommandObject):
+    """
+    Переименовать клан (установить кастомное название для чата)
+    Синтаксис: /rename_clan <номер> <новое название>
+    """
+    try:
+        db_service = get_clan_db_service()
+        permission_service = get_permission_service()
+        
+        # Проверяем права администратора
+        await permission_service.require_admin(
+            message.from_user.id, message.chat.id, "renaming clan"
+        )
+        
+        if not command.args:
+            await message.reply(
+                "❌ **Укажите номер клана и новое название!**\n\n"
+                "**Использование:** `/rename_clan <номер> <новое название>`\n\n"
+                "**Примеры:**\n"
+                "• `/rename_clan 1 Основной клан`\n"
+                "• `/rename_clan 2 Фарм клан`\n"
+                "• `/rename_clan 3 Клан для новичков`\n\n"
+                "Используйте `/clan_list` для просмотра всех кланов.",
+                parse_mode="Markdown"
+            )
+            return
+        
+        # Парсим аргументы: первый аргумент - номер, остальное - новое название
+        args = command.args.split(maxsplit=1)
+        
+        if len(args) < 2:
+            await message.reply(
+                "❌ **Не указано новое название!**\n\n"
+                "**Использование:** `/rename_clan <номер> <новое название>`\n\n"
+                "**Пример:** `/rename_clan 1 Основной клан`"
+            )
+            return
+        
+        try:
+            clan_number = int(args[0])
+            new_name = args[1].strip()
+        except ValueError:
+            await message.reply(
+                "❌ **Некорректный номер клана!**\n\n"
+                "Номер должен быть числом. Пример: `/rename_clan 2 Фарм клан`"
+            )
+            return
+        
+        # Проверяем длину нового названия
+        if len(new_name) < 3:
+            await message.reply(
+                "❌ **Название слишком короткое!**\n\n"
+                "Название должно содержать минимум 3 символа."
+            )
+            return
+        
+        if len(new_name) > 50:
+            await message.reply(
+                "❌ **Название слишком длинное!**\n\n"
+                "Максимальная длина - 50 символов."
+            )
+            return
+        
+        # Получаем список кланов
+        clans = await db_service.get_chat_clans(message.chat.id)
+        
+        if not clans:
+            await message.reply(
+                "❌ **В чате нет зарегистрированных кланов!**\n\n"
+                "Сначала зарегистрируйте клан: `/register_clan #CLANTAG`"
+            )
+            return
+        
+        if not (1 <= clan_number <= len(clans)):
+            await message.reply(
+                f"❌ **Неверный номер клана!**\n\n"
+                f"Доступные кланы: 1-{len(clans)}\n"
+                "Используйте `/clan_list` для просмотра."
+            )
+            return
+        
+        # Получаем выбранный клан
+        selected_clan = clans[clan_number - 1]
+        old_name = selected_clan.clan_name
+        
+        # Переименовываем клан
+        success = await db_service.rename_clan_custom_name(
+            selected_clan.id, 
+            message.chat.id, 
+            new_name
+        )
+        
+        if success:
+            await message.reply(
+                f"✅ **Клан переименован!**\n\n"
+                f"🏰 **Старое название:** {old_name}\n"
+                f"🏰 **Новое название:** {new_name}\n"
+                f"🏷️ **Тег:** `{selected_clan.clan_tag}`\n\n"
+                "💡 Это кастомное название используется только в этом чате.\n"
+                "Название клана в Clash of Clans не изменилось.",
+                parse_mode="Markdown"
+            )
+            
+            # Логируем операцию
+            log_entry = ClanOperationLog.create_log(
+                operation_type='rename',
+                clan_id=selected_clan.id,
+                clan_tag=selected_clan.clan_tag,
+                chat_id=message.chat.id,
+                user_id=message.from_user.id,
+                username=message.from_user.username,
+                operation_details={'old_name': old_name, 'new_name': new_name},
+                result='success'
+            )
+            await db_service.log_operation(log_entry)
+        else:
+            await message.reply(
+                "❌ **Ошибка переименования клана**\n\n"
+                "Попробуйте позже или обратитесь к администратору."
+            )
+        
+    except PermissionDenied:
+        await message.reply(
+            "❌ **Недостаточно прав!**\n\n"
+            "Только администраторы чата могут переименовывать кланы."
+        )
+    except Exception as e:
+        logger.error(f"Error in rename_clan_command: {e}")
+        await message.reply(
+            "❌ **Произошла ошибка**\n\n"
+            "Попробуйте позже или обратитесь к администратору."
+        )
+
+
 @clan_router.message(Command("clan_members"))
+@error_handler
 async def clan_members_command(message: Message, command: CommandObject):
     """
     Показать список участников клана
@@ -610,6 +753,7 @@ async def clan_members_command(message: Message, command: CommandObject):
 
 
 @clan_router.message(Command("update_clan"))
+@error_handler
 async def update_clan_command(message: Message, command: CommandObject):
     """
     Обновить данные клана из CoC API

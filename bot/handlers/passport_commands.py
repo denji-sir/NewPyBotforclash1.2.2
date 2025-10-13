@@ -12,8 +12,10 @@ from ..models.passport_models import (
     PassportInfo, PassportOperationLog, PassportStatus, PassportAlreadyExists,
     PassportNotFound, PassportValidationError, PassportTheme, PassportSettings
 )
+from ..ui.passport_ui import PassportUI
 from ..services.passport_database_service import get_passport_db_service
 from ..services.clan_database_service import get_clan_db_service
+from ..utils.error_handler import error_handler
 from ..utils.validators import format_number, format_date, format_role_emoji, format_role_name
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,7 @@ passport_router = Router(name="passport_router")
 
 
 @passport_router.message(Command("create_passport"))
+@error_handler
 async def create_passport_command(message: Message, command: CommandObject):
     """
     Создание нового паспорта игрока
@@ -209,6 +212,7 @@ async def create_passport_cancel_callback(callback: CallbackQuery):
 
 
 @passport_router.message(Command("passport"))
+@error_handler
 async def passport_command(message: Message, command: CommandObject):
     """
     Показать паспорт игрока
@@ -314,6 +318,7 @@ async def passport_command(message: Message, command: CommandObject):
 
 
 @passport_router.message(Command("edit_passport"))
+@error_handler
 async def edit_passport_command(message: Message, command: CommandObject):
     """
     Редактирование паспорта
@@ -448,6 +453,7 @@ async def edit_passport_command(message: Message, command: CommandObject):
 
 
 @passport_router.message(Command("plist"))
+@error_handler
 async def passport_list_command(message: Message):
     """
     Список всех паспортов в чате
@@ -1030,6 +1036,7 @@ async def passport_refresh_callback(callback: CallbackQuery):
 
 
 @passport_router.message(Command("dpassport"))
+@error_handler
 async def delete_passport_command(message: Message):
     """
     Удаление паспорта (с подтверждением)
